@@ -52,6 +52,9 @@ export function TextInput({
   max,
   className,
   id,
+  onChange,
+  disabled,
+  value,
 }: {
   name: string;
   label?: string;
@@ -65,6 +68,9 @@ export function TextInput({
   max?: number;
   className?: string;
   id?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+  value?: string | number;
 }) {
   const inputId = id ?? name;
   const fieldError = useFieldError(name);
@@ -73,12 +79,15 @@ export function TextInput({
       id={inputId}
       name={name}
       type={type}
-      defaultValue={defaultValue == null ? "" : defaultValue}
+      value={value}
+      defaultValue={value === undefined ? (defaultValue == null ? "" : defaultValue) : undefined}
       required={required}
       placeholder={placeholder}
       step={step}
       min={min}
       max={max}
+      onChange={onChange}
+      disabled={disabled}
       aria-invalid={fieldError ? true : undefined}
     />
   );

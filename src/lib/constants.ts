@@ -3,9 +3,13 @@
 // Roles, permissions, navigation, status labels
 // ============================================================
 
-export const APP_NAME = "Mazikor Schools";
-export const APP_TAGLINE = "Smart School Management, Made Simple.";
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://schools.mazikor.com";
+export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Mazikor Schools";
+export const APP_TAGLINE =
+  process.env.NEXT_PUBLIC_APP_TAGLINE || "Smart School Management, Made Simple.";
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://schools.mazikor.com";
 
 export const BRAND_COLORS = {
   primary: "#1d4ed8",

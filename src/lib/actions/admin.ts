@@ -74,7 +74,12 @@ export async function updateSchool(schoolId: string, formData: FormData) {
     data: {
       name: toStr(formData.get("name")) || existing.name,
       code: toStr(formData.get("code")) || existing.code,
+      type: toStr(formData.get("type")) || null,
       address: toStr(formData.get("address")) || null,
+      district: toStr(formData.get("district")) || null,
+      region: toStr(formData.get("region")) || null,
+      country: toStr(formData.get("country")) || null,
+      timezone: toStr(formData.get("timezone")) || null,
       phone: toStr(formData.get("phone")) || null,
       email: toStr(formData.get("email")) || null,
       website: toStr(formData.get("website")) || null,

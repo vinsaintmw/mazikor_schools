@@ -26,6 +26,11 @@ model School {
   website            String?
   registrationNumber String?
   motto              String?
+  type               String?
+  district           String?
+  region             String?
+  country            String?
+  timezone           String?
   currency           String   @default("MWK")
   currencySymbol     String   @default("MK")
   primaryColor       String   @default("#1d4ed8")
@@ -79,9 +84,29 @@ model School {
   invoiceItems          InvoiceItem[]
   assignmentSubmissions AssignmentSubmission[]
   payrolls              Payroll[]
+  invitations           SchoolInvitation[]
 
   @@index([code])
   @@map("school")
+}
+
+model SchoolInvitation {
+  id        String    @id @default(cuid())
+  schoolId  String
+  email     String
+  name      String
+  roleKey   String    @default("school_admin")
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([email])
+  @@map("school_invitation")
 }
 
 model Plan {

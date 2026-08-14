@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { SchoolIcon } from "lucide-react";
+import Link from "next/link";
+import { SchoolIcon, PlusIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { paginationDefaults, formatDate } from "@/lib/format";
@@ -8,6 +9,7 @@ import { SearchInput } from "@/components/search-input";
 import { Pagination } from "@/components/pagination";
 import { StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -27,7 +29,7 @@ export default async function AdminSchoolsPage({
   const session = await auth();
   if (!session?.user) redirect("/login");
   if (session.user.roleKey !== "super_admin") redirect("/dashboard");
-  const { page, perPage, search, skip } = paginationDefaults(await searchParams);
+  const { page, perPage, search, status, skip } = paginationDefaults(await searchParams);
 
   const where = {
     ...(search
@@ -39,6 +41,7 @@ export default async function AdminSchoolsPage({
           ],
         }
       : {}),
+    ...(status === "ACTIVE" || status === "SUSPENDED" ? { isActive: status === "ACTIVE" } : {}),
   };
 
   const [schools, total] = await Promise.all([
@@ -57,10 +60,27 @@ export default async function AdminSchoolsPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Schools" description="All institutions on the platform" />
+      <PageHeader title="Schools" description="All institutions on the platform">
+        <Button size="sm" asChild>
+          <Link href="/admin/schools/new">
+            <PlusIcon className="size-3.5" /> Create school
+          </Link>
+        </Button>
+      </PageHeader>
 
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput placeholder="Search name, code or email…" />
+        {["ACTIVE", "SUSPENDED"].map((s) => (
+          <Link
+            key={s}
+            href={`/admin/schools?status=${s}`}
+            className={`inline-flex h-8 items-center rounded-lg border px-2.5 text-sm font-medium transition-colors ${
+              status === s ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background hover:bg-muted"
+            }`}
+          >
+            {s.toLowerCase()}
+          </Link>
+        ))}
       </div>
 
       {schools.length ? (
@@ -81,10 +101,10 @@ export default async function AdminSchoolsPage({
               {schools.map((s) => (
                 <TableRow key={s.id}>
                   <TableCell>
-                    <div>
+                    <Link href={`/admin/schools/${s.id}`} className="block hover:underline">
                       <p className="font-medium">{s.name}</p>
                       <p className="text-xs text-muted-foreground">{s.email ?? "—"}</p>
-                    </div>
+                    </Link>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{s.code}</TableCell>
                   <TableCell>{s.subscription?.plan.name ?? "—"}</TableCell>
@@ -102,8 +122,9 @@ export default async function AdminSchoolsPage({
       ) : (
         <EmptyState
           title="No schools found"
-          description="Schools register through the platform onboarding flow."
+          description="Create your first school to get started."
           icon={<SchoolIcon className="size-6" />}
+          action={{ label: "Create school", href: "/admin/schools/new" }}
         />
       )}
 

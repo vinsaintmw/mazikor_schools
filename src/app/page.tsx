@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { LandingPage } from "@/components/landing/landing-page";
 import type { LandingPlan } from "@/components/landing/pricing";
-import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
+import { APP_NAME, APP_TAGLINE, SITE_URL } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: APP_TAGLINE,
@@ -49,7 +49,7 @@ const jsonLd = {
     {
       "@type": "Organization",
       name: APP_NAME,
-      url: process.env.NEXT_PUBLIC_SITE_URL || "https://schools.mazikor.com",
+      url: SITE_URL,
       logo: "/logo.png",
       slogan: APP_TAGLINE,
       description:
