@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { CreditCardIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { paginationDefaults, formatDate } from "@/lib/format";
+import { paginationDefaults, formatDate, formatMoney } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { SearchInput } from "@/components/search-input";
 import { Pagination } from "@/components/pagination";
@@ -54,7 +54,7 @@ export default async function AdminSubscriptionsPage({
 
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput placeholder="Search school…" />
-        {["TRIAL", "ACTIVE", "PAST_DUE", "EXPIRED", "CANCELLED"].map((s) => (
+        {["TRIAL", "ACTIVE", "PAST_DUE", "INCOMPLETE", "EXPIRED", "CANCELLED"].map((s) => (
           <Link
             key={s}
             href={`/admin/subscriptions?status=${s}`}
@@ -75,6 +75,9 @@ export default async function AdminSubscriptionsPage({
                 <TableHead>School</TableHead>
                 <TableHead>Plan</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Billing</TableHead>
+                <TableHead>Provider ref</TableHead>
                 <TableHead>Started</TableHead>
                 <TableHead>Renewal</TableHead>
               </TableRow>
@@ -91,6 +94,27 @@ export default async function AdminSubscriptionsPage({
                   <TableCell>{s.plan.name}</TableCell>
                   <TableCell>
                     <StatusBadge status={s.status} />
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {s.priceAmount != null ? formatMoney(s.priceAmount, s.currency) : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    <span className="font-medium">{s.interval.toLowerCase()}</span>
+                    {s.cancelAtPeriodEnd ? <span className="ml-1.5 text-amber-600">· cancels</span> : null}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {s.provider ? (
+                      <span title={s.providerSubscriptionId ?? undefined}>
+                        <span className="font-medium">{s.provider}</span>
+                        {s.providerSubscriptionId ? (
+                          <span className="ml-1 font-mono text-muted-foreground">
+                            {s.providerSubscriptionId.slice(0, 12)}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-xs">{formatDate(s.startDate)}</TableCell>
                   <TableCell className="text-xs">{s.renewalDate ? formatDate(s.renewalDate) : "—"}</TableCell>

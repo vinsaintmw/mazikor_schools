@@ -110,22 +110,24 @@ model SchoolInvitation {
 }
 
 model Plan {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?
-  priceMonthly Decimal  @default(0)
-  priceYearly  Decimal  @default(0)
-  currency     String   @default("MWK")
-  maxStudents  Int      @default(100)
-  maxTeachers  Int      @default(10)
-  maxStaff     Int      @default(10)
-  maxAdmins    Int      @default(1)
-  maxStorageGB Int      @default(5)
-  features     Json?
-  isActive     Boolean  @default(true)
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id               String   @id @default(cuid())
+  name             String
+  description      String?
+  priceMonthly     Decimal  @default(0)
+  priceYearly      Decimal  @default(0)
+  currency         String   @default("MWK")
+  maxStudents      Int      @default(100)
+  maxTeachers      Int      @default(10)
+  maxStaff         Int      @default(10)
+  maxAdmins        Int      @default(1)
+  maxStorageGB     Int      @default(5)
+  features         Json?
+  providerRef      String? // provider plan/price reference used for MONTHLY billing
+  providerYearlyRef String? // provider plan/price reference used for YEARLY billing
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   subscriptions Subscription[]
 
@@ -133,19 +135,29 @@ model Plan {
 }
 
 model Subscription {
-  id           String    @id @default(cuid())
-  schoolId     String    @unique
-  planId       String
-  status       SubStatus @default(TRIAL)
-  startDate    DateTime  @default(now())
-  renewalDate  DateTime?
-  trialEndsAt  DateTime?
-  customLimits Json?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                     String      @id @default(cuid())
+  schoolId               String      @unique
+  planId                 String
+  status                 SubStatus   @default(TRIAL)
+  interval               SubInterval @default(MONTHLY)
+  startDate              DateTime    @default(now())
+  renewalDate            DateTime?
+  trialEndsAt            DateTime?
+  cancelAtPeriodEnd      Boolean     @default(false)
+  endedAt                DateTime?
+  priceAmount            Decimal?
+  currency               String      @default("MWK")
+  provider               String?
+  providerCustomerId     String?
+  providerSubscriptionId String?
+  customLimits           Json?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
 
   school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  events BillingEvent[]
 
   @@index([planId])
   @@map("subscription")
@@ -157,6 +169,49 @@ enum SubStatus {
   PAST_DUE
   EXPIRED
   CANCELLED
+  INCOMPLETE
+}
+
+enum SubInterval {
+  MONTHLY
+  YEARLY
+}
+
+// Idempotency record for incoming provider webhooks. `(provider, eventId)` is
+// unique so a replayed webhook is recognised and never applied twice.
+model BillingWebhook {
+  id          String   @id @default(cuid())
+  provider    String
+  eventId     String
+  type        String
+  schoolId    String?
+  status      String?
+  payload     Json?
+  receivedAt  DateTime @default(now())
+  processedAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+  @@index([schoolId])
+  @@map("billing_webhook")
+}
+
+// Subscription lifecycle history (checkout started, activated, payment
+// succeeded/failed, plan changed, cancelled, expired, …). Populated from
+// provider confirmations only.
+model BillingEvent {
+  id             String   @id @default(cuid())
+  schoolId       String?
+  subscriptionId String?
+  provider       String?
+  type           String
+  data           Json?
+  createdAt      DateTime @default(now())
+
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, createdAt])
+  @@index([subscriptionId, createdAt])
+  @@map("billing_event")
 }
 
 // ============================================================

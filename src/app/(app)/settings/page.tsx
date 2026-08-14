@@ -12,6 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
 import { SchoolProfileForm, SchoolProfileView } from "@/components/settings/school-profile";
+import { SubscriptionBanner } from "@/components/billing/subscription-banner";
+import { getSubscriptionAccess, getGracePeriodDays } from "@/lib/billing";
 
 export const metadata = { title: "Settings" };
 
@@ -81,9 +83,13 @@ export default async function SettingsPage() {
 
   const canManageSettings = session.user.permissions?.includes("settings.manage") ?? false;
 
+  const access = subscription ? getSubscriptionAccess(subscription, new Date(), getGracePeriodDays()) : null;
+
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description={session.user.schoolName ?? APP_NAME} />
+
+      {access ? <SubscriptionBanner state={access} /> : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

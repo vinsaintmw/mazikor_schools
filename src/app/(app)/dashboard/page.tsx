@@ -23,6 +23,8 @@ import { startOfDay, endOfDay } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { RevenueChart } from "./revenue-chart";
+import { SubscriptionBanner } from "@/components/billing/subscription-banner";
+import { getSubscriptionAccess, getGracePeriodDays } from "@/lib/billing";
 
 import type { Metadata } from "next";
 
@@ -39,14 +41,17 @@ export default async function DashboardPage() {
   const today = new Date();
   const isSchoolAdmin = can(session, "settings.manage");
 
-  const [studentsCount, teachersCount, staffCount, activeStudents, classes, streams] = await Promise.all([
+  const [studentsCount, teachersCount, staffCount, activeStudents, classes, streams, subscription] = await Promise.all([
     db.student.count({ where: { schoolId } }),
     db.teacher.count({ where: { schoolId, status: "ACTIVE" } }),
     db.staff.count({ where: { schoolId, status: "ACTIVE" } }),
     db.student.count({ where: { schoolId, status: "ACTIVE" } }),
     db.class.findMany({ where: { schoolId }, include: { _count: { select: { enrollments: { where: { status: "ACTIVE" } } } } }, orderBy: { level: "asc" } }),
     db.stream.findMany({ where: { schoolId }, orderBy: { name: "asc" } }),
+    db.subscription.findUnique({ where: { schoolId } }),
   ]);
+
+  const access = subscription ? getSubscriptionAccess(subscription, today, getGracePeriodDays()) : null;
 
   const enrollmentByClass = classes.map((c) => ({
     id: c.id,
@@ -164,6 +169,8 @@ export default async function DashboardPage() {
         title={`Welcome back, ${session.user.name?.split(" ")[0] ?? "there"}`}
         description={session.user.schoolName ?? "Overview of your school today"}
       />
+
+      {access && !access.restricted ? null : access ? <SubscriptionBanner state={access} /> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

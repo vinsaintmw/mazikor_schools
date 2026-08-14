@@ -305,6 +305,8 @@ export const ADMIN_NAV: NavSection[] = [
 // ------------------------------------------------------------------
 
 export const STUDENT_STATUSES = ["ACTIVE", "GRADUATED", "TRANSFERRED", "SUSPENDED", "WITHDRAWN"] as const;
+export const SUB_INTERVALS = ["MONTHLY", "YEARLY"] as const;
+export const SUB_STATUSES = ["TRIAL", "ACTIVE", "PAST_DUE", "EXPIRED", "CANCELLED", "INCOMPLETE"] as const;
 export const GENDERS = ["MALE", "FEMALE"] as const;
 export const EXAM_TYPES = ["TEST", "MID_TERM", "END_OF_TERM", "MOCK", "FINAL"] as const;
 export const ATTENDANCE_STATUSES = ["PRESENT", "ABSENT", "LATE", "EXCUSED"] as const;

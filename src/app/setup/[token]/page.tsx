@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { APP_NAME } from "@/lib/constants";
 import { db } from "@/lib/db";
-import { hashToken } from "@/lib/actions/super-admin";
+import { hashToken } from "@/lib/tokens";
 import { SetupPasswordForm } from "@/components/auth/setup-password-form";
 
 export const metadata: Metadata = {

@@ -142,7 +142,9 @@ All configuration lives in a `.env` file at the repository root (gitignored). On
 | `NEXT_PUBLIC_APP_TAGLINE` | No | App tagline used in metadata (default `Smart School Management, Made Simple.`). |
 | `NEXT_PUBLIC_APP_URL` | No | Public site URL used for `metadataBase`, sitemap and robots (default `https://schools.mazikor.com`). Fallback alias: `NEXT_PUBLIC_SITE_URL`. |
 | `NEXT_PUBLIC_DEMO_MODE` | No | `true` shows demo quick-fill buttons on the login page. **Never enable in production.** Default `false`. |
-| `BILLING_PROVIDER` | No | Reserved for a future payment provider. When unset, subscriptions are managed manually by platform admins (see section 15). |
+| `BILLING_PROVIDER` | No | Enables online payments when set to a registered provider id (e.g. `stripe`, `paystack`). When unset, subscriptions are managed manually by platform admins (see section 15). |
+| `BILLING_WEBHOOK_SECRET` | No | Provider webhook signing secret, used server-side to verify `/api/webhooks/billing` requests. |
+| `BILLING_GRACE_PERIOD_DAYS` | No | Days a `PAST_DUE` subscription stays accessible after the missed renewal (default `7`). |
 
 `AUTH_URL`, `NEXT_PUBLIC_APP_URL` and `AUTH_SECRET` **must be set to production values at build/deploy time** — public values are inlined into the client bundle.
 
@@ -297,11 +299,11 @@ Demo mode is purely a **front-end convenience** and never bypasses authenticatio
 
 ## 15. Plans & subscriptions
 
-- **Plans** (`Plan` model) define pricing and usage limits: `maxStudents`, `maxTeachers`, `maxStaff`, `maxAdmins`, `maxStorageGB` plus feature flags.
-- **Subscriptions** link a school to a plan with a status (`TRIAL`, `ACTIVE`, `PAST_DUE`, `EXPIRED`, `CANCELLED`), renewal date and optional per-subscription `customLimits` overrides.
+- **Plans** (`Plan` model) define pricing and usage limits: `maxStudents`, `maxTeachers`, `maxStaff`, `maxAdmins`, `maxStorageGB` plus feature flags and optional provider references (`providerRef` / `providerYearlyRef` for monthly/yearly billing).
+- **Subscriptions** link a school to a plan with a status (`TRIAL`, `ACTIVE`, `PAST_DUE`, `EXPIRED`, `CANCELLED`, `INCOMPLETE`), an interval (`MONTHLY`/`YEARLY`), price/currency, provider customer/subscription ids, renewal date and optional per-subscription `customLimits` overrides.
 - **Usage limits** (`src/lib/limits.ts`) are resolved per school and enforced server-side (`enforceLimit`) on student/teacher/staff creation. `null` or `<= 0` means unlimited.
-- The Settings page shows current plan, subscription status and usage bars against limits.
-- **Billing:** payment processing is intentionally not wired to a provider. `src/lib/billing.ts` defines a `BillingProvider` seam (checkout, cancel, webhook) that currently resolves to a null provider unless `BILLING_PROVIDER` is set. Until then, subscriptions are managed manually by platform administrators.
+- The Settings page shows current plan, subscription status and usage bars against limits. A dedicated **Billing page** (`/settings/billing`) shows price, interval, renewal, plan usage, a plan switcher and provider status, and is where checkout/cancel/sync actions live.
+- **Online billing is not wired to a provider yet.** `src/lib/billing.ts` defines a `BillingProvider` seam (checkout, plan change, cancel, webhook) that resolves to a null provider unless `BILLING_PROVIDER` is set. Webhook events are applied idempotently via `applyBillingEvent` (`src/lib/billing-webhooks.ts`), and status is never trusted from the browser — the provider webhook is the single source of truth. Until a provider is configured, subscriptions are managed manually by platform administrators and nothing is faked. See **`docs/BILLING.md`** for the architecture and exactly what's needed to go live.
 
 ---
 
@@ -349,6 +351,7 @@ The suite uses **Node's built-in test runner** with `tsx`:
 
 - `tests/validation.test.ts` — Zod field validation for forms and API payloads.
 - `tests/limits.test.ts` — plan limit resolution and overrides.
+- `tests/billing.test.ts` — provider status mapping, subscription access policy and price helpers.
 - `tests/tenant-isolation.test.ts` — cross-tenant reads/writes are blocked.
 - `tests/multi-tenant.test.mts` — runtime HTTP-level tenant isolation checks.
 

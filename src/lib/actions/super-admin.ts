@@ -11,12 +11,9 @@ import { isSuperAdminSession, toStr } from "@/lib/server-helpers";
 import { slugify } from "@/lib/slug";
 import { updateSchool } from "@/lib/actions/admin";
 import { error, success } from "@/lib/action-result";
+import { hashToken } from "@/lib/tokens";
 
 const INVITE_TTL_DAYS = 7;
-
-export function hashToken(token: string): string {
-  return crypto.createHash("sha256").update(token).digest("hex");
-}
 
 async function getSession() {
   const session = await auth();
