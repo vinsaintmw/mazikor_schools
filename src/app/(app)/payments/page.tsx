@@ -1,4 +1,5 @@
 import { WalletIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -21,6 +22,7 @@ export default async function PaymentsPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "payments.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, skip } = paginationDefaults(await searchParams);
 
@@ -28,6 +30,7 @@ export default async function PaymentsPage({
     "use server";
     const session = await auth();
     if (!session?.user) return [];
+    if (!can(session, "payments.view")) return [];
     const schoolId = getSchoolId(session);
     const rows = await db.payment.findMany({
       where: {
@@ -136,7 +139,6 @@ export default async function PaymentsPage({
         <EmptyState
           title="No payments found"
           description="Record a payment against an invoice."
-          action={canRecord ? { label: "Record payment", href: "/payments" } : undefined}
           icon={<WalletIcon className="size-6" />}
         />
       )}

@@ -1,4 +1,5 @@
 import { ChartColumnIcon, WalletIcon, ReceiptIcon, TrendingUpIcon, TrendingDownIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -24,6 +25,7 @@ export const metadata = { title: "Financial reports" };
 export default async function FinanceReportsPage() {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "finance.reports")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
 
   const [revenueAgg, expenseAgg, expenseGroups, monthRevenue, invoiceAgg, invoiceCount, outstandingInvoices] =

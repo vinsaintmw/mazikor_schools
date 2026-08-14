@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PlusIcon } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -22,6 +23,7 @@ export default async function StudentsPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "students.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const sp = await searchParams;
   const { page, perPage, search, status, skip } = paginationDefaults(sp);
@@ -56,6 +58,7 @@ export default async function StudentsPage({
     "use server";
     const session = await auth();
     if (!session?.user) return [];
+    if (!can(session, "students.view")) return [];
     const schoolId = getSchoolId(session);
     const rows = await db.student.findMany({
       where: {

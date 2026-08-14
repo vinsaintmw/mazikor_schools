@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PlusIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
@@ -21,6 +22,7 @@ export default async function ParentsPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "parents.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, skip } = paginationDefaults(await searchParams);
 
@@ -28,6 +30,7 @@ export default async function ParentsPage({
     "use server";
     const session = await auth();
     if (!session?.user) return [];
+    if (!can(session, "parents.view")) return [];
     const schoolId = getSchoolId(session);
     const rows = await db.parent.findMany({
       where: {

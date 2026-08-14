@@ -29,6 +29,7 @@ export default async function ReportCardsPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!can(session, "reportcards.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const sp = await searchParams;
   const get = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]);
@@ -130,27 +131,27 @@ export default async function ReportCardsPage({
           <CardContent className="pt-4">
             {reportRows.length ? (
               <>
-                <div className="rounded-lg border">
+                <div className="overflow-x-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Subject</TableHead>
-                        <TableHead>Mark</TableHead>
-                        <TableHead>Max</TableHead>
-                        <TableHead>%</TableHead>
-                        <TableHead>Grade</TableHead>
-                        <TableHead>Points</TableHead>
+                        <TableHead className="text-right">Mark</TableHead>
+                        <TableHead className="text-right">Max</TableHead>
+                        <TableHead className="text-right">%</TableHead>
+                        <TableHead className="text-right">Grade</TableHead>
+                        <TableHead className="text-right">Points</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {reportRows.map((r) => (
                         <TableRow key={r.subject}>
                           <TableCell className="font-medium">{r.subject}</TableCell>
-                          <TableCell className="font-mono">{r.mark}</TableCell>
-                          <TableCell className="font-mono">{r.maxMark}</TableCell>
-                          <TableCell className="font-mono">{r.percentage}%</TableCell>
-                          <TableCell className="font-semibold">{r.grade ?? "—"}</TableCell>
-                          <TableCell className="font-mono">{r.points}</TableCell>
+                          <TableCell className="text-right font-mono">{r.mark}</TableCell>
+                          <TableCell className="text-right font-mono">{r.maxMark}</TableCell>
+                          <TableCell className="text-right font-mono">{r.percentage}%</TableCell>
+                          <TableCell className="text-right font-semibold">{r.grade ?? "—"}</TableCell>
+                          <TableCell className="text-right font-mono">{r.points}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

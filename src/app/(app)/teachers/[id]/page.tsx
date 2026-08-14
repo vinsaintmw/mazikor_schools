@@ -25,6 +25,7 @@ export const metadata: Metadata = {
 export default async function TeacherDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!can(session, "teachers.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
 
   const { id } = await params;

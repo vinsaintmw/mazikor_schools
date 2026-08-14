@@ -1,4 +1,5 @@
 import { TagsIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
@@ -22,6 +23,7 @@ export default async function FeesPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "fees.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, skip } = paginationDefaults(await searchParams);
 
@@ -31,6 +33,7 @@ export default async function FeesPage({
     "use server";
     const session = await auth();
     if (!session?.user) return [];
+    if (!can(session, "fees.view")) return [];
     const schoolId = getSchoolId(session);
     const rows = await db.feeStructure.findMany({
       where: {
@@ -91,7 +94,6 @@ export default async function FeesPage({
         <EmptyState
           title="No fee structures found"
           description="Add fee structures to generate invoices."
-          action={canManage ? { label: "New fee structure", href: "/fees" } : undefined}
           icon={<TagsIcon className="size-6" />}
         />
       )}

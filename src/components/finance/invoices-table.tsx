@@ -127,8 +127,8 @@ export function InvoicesTable({
             <TableRow>
               <TableHead>Invoice</TableHead>
               <TableHead>Student</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Paid</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Paid</TableHead>
               <TableHead>Due date</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -152,10 +152,10 @@ export function InvoicesTable({
                       {fullName(inv.student.firstName, inv.student.middleName, inv.student.lastName)}
                     </Link>
                   </TableCell>
-                  <TableCell data-label="Total" className="font-mono">
+                  <TableCell data-label="Total" className="text-right font-mono">
                     {formatMoney(total)}
                   </TableCell>
-                  <TableCell data-label="Paid" className="font-mono">
+                  <TableCell data-label="Paid" className="text-right font-mono">
                     {formatMoney(paid)}
                   </TableCell>
                   <TableCell data-label="Due date">{inv.dueDate ? formatDate(inv.dueDate) : "—"}</TableCell>

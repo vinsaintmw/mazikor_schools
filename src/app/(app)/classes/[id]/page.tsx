@@ -31,6 +31,7 @@ export const metadata: Metadata = {
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!can(session, "classes.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
 
   const { id } = await params;

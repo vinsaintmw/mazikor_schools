@@ -119,7 +119,7 @@ export function PaymentsTable({
               <TableHead>Receipt</TableHead>
               <TableHead>Student</TableHead>
               <TableHead>Invoice</TableHead>
-              <TableHead>Amount</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
               <TableHead>Method</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -140,7 +140,7 @@ export function PaymentsTable({
                   <TableCell data-label="Invoice" className="font-mono text-xs">
                     {payment.invoice?.number ?? "—"}
                   </TableCell>
-                  <TableCell data-label="Amount" className="font-mono font-medium">
+                  <TableCell data-label="Amount" className="text-right font-mono font-medium">
                     {formatMoney(payment.amount)}
                   </TableCell>
                   <TableCell data-label="Method" className="capitalize">

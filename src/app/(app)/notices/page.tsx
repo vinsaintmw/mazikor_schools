@@ -1,4 +1,5 @@
 import { MegaphoneIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -30,6 +31,7 @@ export default async function NoticesPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "notices.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const sp = await searchParams;
   const { page, perPage, search, skip } = paginationDefaults(sp);
@@ -132,7 +134,6 @@ export default async function NoticesPage({
         <EmptyState
           title="No notices found"
           description="Publish a notice to share announcements."
-          action={canManage ? { label: "New notice", href: "/notices" } : undefined}
           icon={<MegaphoneIcon className="size-6" />}
         />
       )}

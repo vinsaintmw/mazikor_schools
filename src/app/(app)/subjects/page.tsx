@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -20,6 +21,7 @@ export default async function SubjectsPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "subjects.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, skip } = paginationDefaults(await searchParams);
 
@@ -32,6 +34,7 @@ export default async function SubjectsPage({
     "use server";
     const session = await auth();
     if (!session?.user) return [];
+    if (!can(session, "subjects.view")) return [];
     const schoolId = getSchoolId(session);
     const rows = await db.subject.findMany({
       where: {
@@ -104,7 +107,6 @@ export default async function SubjectsPage({
         <EmptyState
           title="No subjects found"
           description="Add subjects to start building class timetables and exams."
-          action={canCreate ? { label: "New subject", href: "/subjects" } : undefined}
         />
       )}
     </div>

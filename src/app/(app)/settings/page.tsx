@@ -1,6 +1,8 @@
 import { Building2Icon, CreditCardIcon, CalendarDaysIcon, GaugeIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { getSchoolId } from "@/lib/server-helpers";
 import { formatDate } from "@/lib/format";
 import { titleCase, APP_NAME } from "@/lib/constants";
@@ -49,6 +51,7 @@ function LimitRow({ label, used, limit }: { label: string; used: number; limit: 
 export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "settings.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
 
   const [school, academicYears, subscription, limits, studentCount, teacherCount, staffCount] = await Promise.all([

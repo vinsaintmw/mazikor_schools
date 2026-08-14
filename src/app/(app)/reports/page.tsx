@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   BarChart3Icon,
   WalletIcon,
@@ -22,6 +23,7 @@ export const metadata = { title: "Reports" };
 export default async function ReportsPage() {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "reports.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
 
   const canViewFinance = can(session, "finance.reports");

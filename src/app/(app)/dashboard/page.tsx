@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { StatusBadge } from "@/components/status-badge";
 import { startOfDay, endOfDay } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
 import { RevenueChart } from "./revenue-chart";
 
 import type { Metadata } from "next";
@@ -395,41 +396,6 @@ export default async function DashboardPage() {
         </Card>
       ) : null}
     </div>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  sub,
-  href,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub: string;
-  href: string;
-}) {
-  return (
-    <Link href={href} className="block">
-      <Card className="transition-colors hover:bg-muted/40 cursor-pointer">
-        <CardContent className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-            <p className="mt-1 truncate text-xs text-muted-foreground">{sub}</p>
-          </div>
-          <span
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
-            aria-hidden="true"
-          >
-            {icon}
-          </span>
-        </CardContent>
-        <ArrowRightIcon className="size-4 text-primary/60 mt-2 ml-2 transition-transform hover:translate-x-1" />
-      </Card>
-    </Link>
   );
 }
 

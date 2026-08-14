@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CalendarOffIcon, ClockIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { getSchoolId } from "@/lib/server-helpers";
 import { paginationDefaults, formatDate, fullName } from "@/lib/format";
 import { getLabel, LEAVE_TYPES } from "@/lib/constants";
@@ -31,6 +33,7 @@ export default async function LeavePage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "leave.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, status, skip } = paginationDefaults(await searchParams);
 

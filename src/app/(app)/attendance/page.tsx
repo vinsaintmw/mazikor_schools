@@ -33,6 +33,7 @@ export default async function AttendancePage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!can(session, "attendance.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const sp = await searchParams;
   const get = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]);

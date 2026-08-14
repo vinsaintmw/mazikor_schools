@@ -1,6 +1,8 @@
 import { BusIcon, RouteIcon, UsersIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { getSchoolId } from "@/lib/server-helpers";
 import { formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
@@ -21,6 +23,7 @@ export const metadata = { title: "Transport" };
 export default async function TransportPage() {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "transport.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
 
   const [vehicles, routes, activeVehicles] = await Promise.all([

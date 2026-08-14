@@ -32,6 +32,7 @@ export default async function AssignmentsPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!can(session, "assignments.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, skip } = paginationDefaults(await searchParams);
 
@@ -140,7 +141,6 @@ export default async function AssignmentsPage({
         <EmptyState
           title="No assignments found"
           description="Create an assignment to give students work."
-          action={canCreate ? { label: "New assignment", href: "/assignments" } : undefined}
           icon={<ClipboardListIcon className="size-6" />}
         />
       )}

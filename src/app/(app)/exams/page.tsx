@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PlusIcon, FileTextIcon, ExternalLinkIcon, CheckIcon, EyeOffIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
@@ -32,6 +33,7 @@ export default async function ExamsPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "exams.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const sp = await searchParams;
   const { page, perPage, search, skip } = paginationDefaults(sp);

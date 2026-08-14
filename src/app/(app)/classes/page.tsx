@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PlusIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
@@ -16,6 +17,7 @@ export const metadata = { title: "Classes" };
 export default async function ClassesPage() {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "classes.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
 
   const classes = await db.class.findMany({

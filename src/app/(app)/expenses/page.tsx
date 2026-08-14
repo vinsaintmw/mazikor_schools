@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ReceiptIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
@@ -23,6 +24,7 @@ export default async function ExpensesPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "expenses.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const sp = await searchParams;
   const { page, perPage, search, skip } = paginationDefaults(sp);
@@ -32,6 +34,7 @@ export default async function ExpensesPage({
     "use server";
     const session = await auth();
     if (!session?.user) return [];
+    if (!can(session, "expenses.view")) return [];
     const schoolId = getSchoolId(session);
     const rows = await db.expense.findMany({
       where: {
@@ -94,7 +97,6 @@ export default async function ExpensesPage({
         <EmptyState
           title="No expenses found"
           description="Record an expense to track school spending."
-          action={canManage ? { label: "New expense", href: "/expenses" } : undefined}
           icon={<ReceiptIcon className="size-6" />}
         />
       )}

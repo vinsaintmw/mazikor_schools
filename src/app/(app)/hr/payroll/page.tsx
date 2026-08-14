@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { BanknoteIcon, WalletIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { getSchoolId } from "@/lib/server-helpers";
 import { paginationDefaults, formatMoney, formatDate, fullName } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
@@ -28,6 +30,7 @@ export default async function PayrollPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "payroll.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, status, skip } = paginationDefaults(await searchParams);
 
@@ -112,8 +115,8 @@ export default async function PayrollPage({
               <TableRow>
                 <TableHead>Employee</TableHead>
                 <TableHead>Period</TableHead>
-                <TableHead>Basic</TableHead>
-                <TableHead>Net</TableHead>
+                <TableHead className="text-right">Basic</TableHead>
+                <TableHead className="text-right">Net</TableHead>
                 <TableHead>Paid</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
@@ -132,8 +135,8 @@ export default async function PayrollPage({
                   <TableCell className="text-xs">
                     {formatDate(p.periodStart)} – {formatDate(p.periodEnd)}
                   </TableCell>
-                  <TableCell className="font-mono">{formatMoney(p.basicSalary)}</TableCell>
-                  <TableCell className="font-mono font-medium">{formatMoney(p.netSalary)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatMoney(p.basicSalary)}</TableCell>
+                  <TableCell className="text-right font-mono font-medium">{formatMoney(p.netSalary)}</TableCell>
                   <TableCell>{p.paidDate ? formatDate(p.paidDate) : "—"}</TableCell>
                   <TableCell>
                     <StatusBadge status={p.status} />

@@ -38,6 +38,7 @@ export default async function StudentDetailPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!can(session, "students.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
 
   const { id } = await params;
@@ -171,6 +172,7 @@ export default async function StudentDetailPage({
             balance,
             attendanceRate,
           }}
+          canViewFinance={canViewFinance}
         />
       ) : null}
 
@@ -230,6 +232,7 @@ function QuickStat({ label, value, tone }: { label: string; value: string; tone?
 function OverviewTab({
   student,
   stats,
+  canViewFinance,
 }: {
   student: {
     gender: string;
@@ -243,17 +246,22 @@ function OverviewTab({
     medicalNotes: string | null;
   };
   stats: { billed: number; paid: number; balance: number; attendanceRate: number | null };
+  canViewFinance: boolean;
 }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <QuickStat label="Total billed" value={formatMoney(stats.billed)} />
-        <QuickStat label="Total paid" value={formatMoney(stats.paid)} />
-        <QuickStat
-          label="Balance"
-          value={formatMoney(stats.balance)}
-          tone={stats.balance > 0 ? "text-destructive" : "text-emerald-600"}
-        />
+        {canViewFinance ? (
+          <>
+            <QuickStat label="Total billed" value={formatMoney(stats.billed)} />
+            <QuickStat label="Total paid" value={formatMoney(stats.paid)} />
+            <QuickStat
+              label="Balance"
+              value={formatMoney(stats.balance)}
+              tone={stats.balance > 0 ? "text-destructive" : "text-emerald-600"}
+            />
+          </>
+        ) : null}
         <QuickStat
           label="Attendance rate"
           value={stats.attendanceRate === null ? "—" : `${stats.attendanceRate}%`}

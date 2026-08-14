@@ -51,7 +51,7 @@ export function FeesTable({
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Category</TableHead>
-            <TableHead>Amount</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
             <TableHead>Class</TableHead>
             <TableHead>Term</TableHead>
             <TableHead>Status</TableHead>
@@ -65,7 +65,7 @@ export function FeesTable({
                 {f.name}
               </TableCell>
               <TableCell data-label="Category">{f.category}</TableCell>
-              <TableCell data-label="Amount" className="font-mono">
+              <TableCell data-label="Amount" className="text-right font-mono">
                 {formatMoney(f.amount)}
               </TableCell>
               <TableCell data-label="Class">{f.class?.name ?? "All classes"}</TableCell>

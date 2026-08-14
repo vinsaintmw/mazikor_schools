@@ -1,6 +1,8 @@
 import { BoxesIcon, PackageIcon, WalletIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { getSchoolId } from "@/lib/server-helpers";
 import { paginationDefaults, formatMoney, formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
@@ -27,6 +29,7 @@ export default async function InventoryPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "inventory.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, skip } = paginationDefaults(await searchParams);
 
@@ -102,12 +105,12 @@ export default async function InventoryPage({
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">{i.name}</TableCell>
                   <TableCell>{i.category}</TableCell>
-                  <TableCell className="font-mono">{i.quantity}</TableCell>
+                  <TableCell className="text-right font-mono">{i.quantity}</TableCell>
                   <TableCell>
                     <StatusBadge status={i.condition} />
                   </TableCell>
                   <TableCell>{i.location ?? "—"}</TableCell>
-                  <TableCell className="font-mono">{formatMoney(i.value)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatMoney(i.value)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

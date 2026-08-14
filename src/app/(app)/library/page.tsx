@@ -1,6 +1,8 @@
 import { LibraryIcon, BookOpenIcon, ClockIcon, AlertTriangleIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { getSchoolId } from "@/lib/server-helpers";
 import { paginationDefaults, formatDate, fullName } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
@@ -27,6 +29,7 @@ export default async function LibraryPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "library.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, skip } = paginationDefaults(await searchParams);
 
@@ -86,7 +89,7 @@ export default async function LibraryPage({
           icon={<ClockIcon className="size-4" />}
           label="Active loans"
           value={String(activeLoans)}
-          sub={`${recentLoans.length} recent records`}
+          sub="Borrowed now"
           href="/library"
         />
         <StatCard

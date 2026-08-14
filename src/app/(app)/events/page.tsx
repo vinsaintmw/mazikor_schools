@@ -1,4 +1,5 @@
 import { PartyPopperIcon, MapPinIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -22,6 +23,7 @@ export default async function EventsPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "events.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, skip } = paginationDefaults(await searchParams);
   const today = new Date();
@@ -68,7 +70,6 @@ export default async function EventsPage({
         <EmptyState
           title="No events found"
           description="Add events to the school calendar."
-          action={canManage ? { label: "New event", href: "/events" } : undefined}
           icon={<PartyPopperIcon className="size-6" />}
         />
       )}

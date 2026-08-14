@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PlusIcon, ScrollTextIcon } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -22,6 +23,7 @@ export default async function InvoicesPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "invoices.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const sp = await searchParams;
   const { page, perPage, search, skip } = paginationDefaults(sp);
@@ -43,6 +45,7 @@ export default async function InvoicesPage({
     "use server";
     const session = await auth();
     if (!session?.user) return [];
+    if (!can(session, "invoices.view")) return [];
     const schoolId = getSchoolId(session);
     const rows = await db.invoice.findMany({
       where: {

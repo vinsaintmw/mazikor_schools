@@ -17,6 +17,7 @@ export const metadata = { title: "Assignment details" };
 export default async function AssignmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!can(session, "assignments.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
 
   const { id } = await params;

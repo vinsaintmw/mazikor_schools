@@ -46,7 +46,7 @@ export function ExpensesTable({
             <TableHead>Description</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Vendor</TableHead>
-            <TableHead>Amount</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
             <TableHead>Date</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -62,7 +62,7 @@ export function ExpensesTable({
               </TableCell>
               <TableCell data-label="Category">{getLabel(e.category, EXPENSE_CATEGORIES)}</TableCell>
               <TableCell data-label="Vendor">{e.vendor ?? "—"}</TableCell>
-              <TableCell data-label="Amount" className="font-mono">
+              <TableCell data-label="Amount" className="text-right font-mono">
                 {formatMoney(e.amount)}
               </TableCell>
               <TableCell data-label="Date">{formatDate(e.date)}</TableCell>

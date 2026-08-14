@@ -50,8 +50,8 @@ export default async function AdminPlansPage() {
                       {p.description ? <p className="text-xs text-muted-foreground">{p.description}</p> : null}
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono">{formatMoney(p.priceMonthly)}</TableCell>
-                  <TableCell className="font-mono">{formatMoney(p.priceYearly)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatMoney(p.priceMonthly)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatMoney(p.priceYearly)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {p.maxStudents} students · {p.maxTeachers} teachers · {p.maxStaff} staff · {p.maxStorageGB} GB
                   </TableCell>

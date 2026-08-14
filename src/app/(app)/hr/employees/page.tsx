@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { BriefcaseIcon, UsersIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { getSchoolId } from "@/lib/server-helpers";
 import { paginationDefaults, formatMoney, formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
@@ -30,6 +32,7 @@ export default async function EmployeesPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
+  if (!can(session, "hr.view")) redirect("/dashboard");
   const schoolId = getSchoolId(session);
   const { page, perPage, search, status, skip } = paginationDefaults(await searchParams);
 
@@ -105,7 +108,7 @@ export default async function EmployeesPage({
                 <TableHead>Position</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Phone</TableHead>
-                <TableHead>Salary</TableHead>
+                <TableHead className="text-right">Salary</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -125,7 +128,7 @@ export default async function EmployeesPage({
                   <TableCell>{e.position ?? "—"}</TableCell>
                   <TableCell>{e.department?.name ?? "—"}</TableCell>
                   <TableCell>{e.phone ?? "—"}</TableCell>
-                  <TableCell className="font-mono">{formatMoney(e.salary ?? 0)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatMoney(e.salary ?? 0)}</TableCell>
                   <TableCell>
                     <StatusBadge status={e.status} />
                   </TableCell>
