@@ -14,7 +14,7 @@ export function resolvePermissions(roleKey: string, dbPermissions: string[]): Pe
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 },
+  session: { strategy: "jwt", maxAge: 60 * 60 * 24 },
   pages: { signIn: "/login", error: "/login?error=1" },
   providers: [
     Credentials({

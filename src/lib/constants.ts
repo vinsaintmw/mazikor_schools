@@ -5,7 +5,16 @@
 
 export const APP_NAME = "Mazikor Schools";
 export const APP_TAGLINE = "Smart School Management, Made Simple.";
-export const PRIMARY_COLOR = "#1d4ed8";
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://schools.mazikor.com";
+
+export const BRAND_COLORS = {
+  primary: "#1d4ed8",
+  secondary: "#059669",
+  accent: "#d97706",
+  danger: "#dc2626",
+  info: "#7c3aed",
+  success: "#0891b2",
+} as const;
 
 export const ROLE_KEYS = {
   SUPER_ADMIN: "super_admin",

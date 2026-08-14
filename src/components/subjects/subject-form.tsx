@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect, TextAreaField } from "@/components/forms";
+import { toast } from "sonner";
 
 export interface SubjectFormValues {
   id?: string;
@@ -29,7 +31,7 @@ export function SubjectFormDialog({
   departments,
   mode,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<unknown>;
   subject?: SubjectFormValues | null;
   departments: { id: string; name: string }[];
   mode: "create" | "edit";
@@ -54,10 +56,11 @@ export function SubjectFormDialog({
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "New subject" : "Edit subject"}</DialogTitle>
         </DialogHeader>
-        <form
-          action={async (formData) => {
-            await action(formData);
+        <ActionForm
+          action={action}
+          onSuccess={() => {
             setOpen(false);
+            toast.success(mode === "create" ? "Subject created" : "Subject updated");
           }}
           className="grid gap-4 sm:grid-cols-2"
         >
@@ -78,7 +81,7 @@ export function SubjectFormDialog({
           <div className="flex justify-end gap-2 sm:col-span-2">
             <SubmitButton>{mode === "create" ? "Create subject" : "Save changes"}</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </DialogContent>
     </Dialog>
   );

@@ -59,6 +59,18 @@ export function enumOf<T extends readonly string[]>(
   return allowed.includes(value) ? (value as T[number]) : fallback;
 }
 
+/** True when the value is empty or a valid http(s) URL. */
+export function isValidHttpUrl(value: string): boolean {
+  const v = value.trim();
+  if (!v) return true;
+  try {
+    const url = new URL(v);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function assertPermission(session: Session, permission: string): void {
   const perms = session.user?.permissions ?? [];
   if (session.user.roleKey === "super_admin") return;

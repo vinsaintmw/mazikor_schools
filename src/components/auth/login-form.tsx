@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Loader2Icon, LogInIcon } from "lucide-react";
+import { Loader2Icon, LogInIcon, AlertCircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +27,10 @@ export function LoginForm() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
-  const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
+  const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+  const urlError = searchParams.get("error")
+    ? "Invalid email or password. Please try again."
+    : "";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,8 +89,8 @@ export function LoginForm() {
             placeholder="••••••••"
           />
         </div>
-        {error ? (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+        {error || urlError ? (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error || urlError}</p>
         ) : null}
         <Button type="submit" disabled={pending} className="w-full">
           {pending ? <Loader2Icon className="size-4 animate-spin" /> : <LogInIcon className="size-4" />}

@@ -11,12 +11,18 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect } from "@/components/forms";
 import { StatusBadge } from "@/components/status-badge";
 import { DeleteButton } from "@/components/delete-button";
 import { addExamSubject, removeExamSubject, publishExam, deleteExam } from "@/lib/actions/academics";
+import { SetBreadcrumbLabel } from "@/components/layout/set-breadcrumb-label";
 
-export const metadata = { title: "Exam details" };
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Exam details",
+};
 
 export default async function ExamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -52,12 +58,17 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="space-y-6">
+      <SetBreadcrumbLabel path={`/exams/${exam.id}`} label={exam.name} />
       <PageHeader
         title={exam.name}
         description={`${getLabel(exam.type, EXAM_TYPES)} · ${exam.term?.name ?? "—"} · ${exam.term?.academicYear?.name ?? ""}`}
       >
         {canPublish ? (
-          <form action={publishExam.bind(null, exam.id, !exam.isPublished)}>
+          <form
+            action={async () => {
+              await publishExam(exam.id, !exam.isPublished);
+            }}
+          >
             <Button type="submit" variant={exam.isPublished ? "outline" : "default"}>
               {exam.isPublished ? <EyeOffIcon /> : <CheckIcon />}
               {exam.isPublished ? "Unpublish" : "Publish results"}
@@ -124,7 +135,7 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
                 <CardDescription>Choose the subject, class and paper details.</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
-                <form action={addExamSubject} className="grid gap-3 sm:grid-cols-2">
+                <ActionForm action={addExamSubject} className="grid gap-3 sm:grid-cols-2" successLabel="Subject added">
                   <input type="hidden" name="examId" value={exam.id} />
                   <NativeSelect
                     name="subjectId"
@@ -141,7 +152,7 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
                     placeholder="Select class"
                   />
                   <TextInput name="date" label="Exam date" type="date" />
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-3">
                     <TextInput name="maxMark" label="Max" type="number" min={1} defaultValue={100} />
                     <TextInput name="passMark" label="Pass" type="number" min={0} defaultValue={40} />
                     <TextInput name="weight" label="Weight" type="number" min={1} defaultValue={1} />
@@ -152,7 +163,7 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
                       Add subject
                     </SubmitButton>
                   </div>
-                </form>
+                </ActionForm>
               </CardContent>
             </Card>
           ) : null}
@@ -185,7 +196,11 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
                           </Button>
                         ) : null}
                         {canEdit ? (
-                          <form action={removeExamSubject.bind(null, es.id)}>
+                          <form
+                            action={async () => {
+                              await removeExamSubject(es.id);
+                            }}
+                          >
                             <Button type="submit" variant="ghost" size="icon-sm" aria-label="Remove paper">
                               <XIcon />
                             </Button>

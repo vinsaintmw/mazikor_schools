@@ -1,9 +1,32 @@
+"use client";
+
 import { createStudent, updateStudent } from "@/lib/actions/people";
+import { ActionForm } from "@/components/action-form";
 import { SubmitButton } from "@/components/submit-button";
+import { CancelButton } from "@/components/cancel-button";
 import { TextInput, NativeSelect, TextAreaField } from "@/components/forms";
 import { GENDERS, STUDENT_STATUSES } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
-import type { StudentFormData } from "./shared";
+
+export type StudentFormData = {
+  id: string;
+  firstName: string;
+  middleName?: string | null;
+  lastName: string;
+  gender: string;
+  dateOfBirth?: Date | null;
+  nationality?: string | null;
+  admissionNumber?: string | null;
+  admissionDate?: Date | null;
+  streamId?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  house?: string | null;
+  previousSchool?: string | null;
+  address?: string | null;
+  medicalNotes?: string | null;
+  status: string;
+};
 
 export function StudentForm({
   student,
@@ -14,37 +37,43 @@ export function StudentForm({
   streams: { id: string; name: string }[];
   mode: "create" | "edit";
 }) {
-  const action = student
-    ? updateStudent.bind(null, student.id)
-    : createStudent;
+  const initialData: Partial<StudentFormData> = mode === "create" ? {} : (student ?? {});
+
+  const action = async (formData: FormData) =>
+    mode === "create" ? createStudent(formData) : updateStudent(student?.id ?? "", formData);
 
   return (
-    <form action={action} className="space-y-6">
+    <ActionForm
+      action={action}
+      className="space-y-6"
+      successLabel={mode === "create" ? "Student created" : "Changes saved"}
+    >
+      <input type="hidden" name="studentId" value={student?.id ?? ""} />
       <div className="grid gap-4 sm:grid-cols-2">
         <TextInput
           name="firstName"
           label="First name"
           required
-          defaultValue={student?.firstName}
+          defaultValue={initialData.firstName}
           placeholder="e.g. Chisomo"
         />
         <TextInput
           name="middleName"
           label="Middle name"
-          defaultValue={student?.middleName}
+          defaultValue={initialData.middleName}
         />
         <TextInput
           name="lastName"
           label="Last name"
           required
-          defaultValue={student?.lastName}
+          defaultValue={initialData.lastName}
           placeholder="e.g. Banda"
         />
         <NativeSelect
           name="gender"
           label="Gender"
           required
-          defaultValue={student?.gender}
+          defaultValue={initialData.gender}
           options={GENDERS.map((g) => ({ value: g, label: g.toLowerCase() }))}
           placeholder="Select gender"
         />
@@ -52,77 +81,78 @@ export function StudentForm({
           name="dateOfBirth"
           label="Date of birth"
           type="date"
-          defaultValue={student?.dateOfBirth ? formatDate(student.dateOfBirth) : undefined}
+          defaultValue={initialData.dateOfBirth ? formatDate(initialData.dateOfBirth) : undefined}
         />
         <TextInput
           name="nationality"
           label="Nationality"
-          defaultValue={student?.nationality ?? "Malawian"}
+          defaultValue={initialData.nationality ?? "Malawian"}
         />
         <TextInput
           name="admissionNumber"
           label="Admission number"
           hint={mode === "create" ? "Leave blank to auto-generate" : undefined}
-          defaultValue={student?.admissionNumber}
+          defaultValue={initialData.admissionNumber}
         />
         <TextInput
           name="admissionDate"
           label="Admission date"
           type="date"
-          defaultValue={student?.admissionDate ? formatDate(student.admissionDate) : undefined}
+          defaultValue={initialData.admissionDate ? formatDate(initialData.admissionDate) : undefined}
         />
         <NativeSelect
           name="streamId"
           label="Class / Stream"
-          defaultValue={student?.streamId ?? null}
+          defaultValue={initialData.streamId ?? null}
           options={streams.map((s) => ({ value: s.id, label: s.name }))}
           placeholder="Assign to a class stream"
         />
         <TextInput
           name="phone"
           label="Phone"
-          defaultValue={student?.phone}
+          defaultValue={initialData.phone}
           placeholder="e.g. +265 999 000 000"
         />
         <TextInput
           name="email"
           label="Email"
           type="email"
-          defaultValue={student?.email}
+          defaultValue={initialData.email}
         />
         <TextInput
           name="house"
           label="House"
-          defaultValue={student?.house}
+          defaultValue={initialData.house}
           placeholder="e.g. Lilongwe House"
         />
         <TextInput
           name="previousSchool"
           label="Previous school"
-          defaultValue={student?.previousSchool}
+          defaultValue={initialData.previousSchool}
         />
         <NativeSelect
           name="status"
           label="Status"
-          defaultValue={student?.status ?? "ACTIVE"}
+          defaultValue={initialData.status ?? "ACTIVE"}
           options={STUDENT_STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, " ").toLowerCase() }))}
         />
         <TextAreaField
           name="address"
           label="Address"
-          defaultValue={student?.address}
+          defaultValue={initialData.address}
           rows={2}
         />
         <TextAreaField
           name="medicalNotes"
           label="Medical notes"
-          defaultValue={student?.medicalNotes}
+          defaultValue={initialData.medicalNotes}
           rows={2}
         />
       </div>
       <div className="flex justify-end gap-2">
+        <CancelButton href={student ? `/students/${student.id}` : "/students"} />
         <SubmitButton>{mode === "create" ? "Create student" : "Save changes"}</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }

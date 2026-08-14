@@ -8,6 +8,8 @@ import { getSchoolId } from "@/lib/server-helpers";
 import { fullName, formatDate } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
+import { MarksInput } from "@/components/marks-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { saveMarks } from "@/lib/actions/academics";
@@ -85,9 +87,9 @@ export default async function MarksPage({
         </CardHeader>
         <CardContent>
           {enrollments.length ? (
-            <form action={saveMarks.bind(null, examSubjectId)} className="space-y-4">
+            <ActionForm action={saveMarks.bind(null, examSubjectId)} className="space-y-4" successLabel="Marks saved">
               <div className="rounded-lg border">
-                <Table>
+                <Table className="table-cards">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Student</TableHead>
@@ -101,33 +103,31 @@ export default async function MarksPage({
                       const ex = existingByStudent.get(e.studentId);
                       return (
                         <TableRow key={e.studentId}>
-                          <TableCell>
+                          <TableCell data-label="Student" data-span="full">
                             <span className="font-medium">
                               {fullName(e.student.firstName, e.student.middleName, e.student.lastName)}
                             </span>
                             <span className="ml-2 font-mono text-xs text-muted-foreground">{e.student.admissionNumber}</span>
                           </TableCell>
-                          <TableCell>
-                            <input
+                          <TableCell data-label={`Mark / ${maxMark}`}>
+                            <MarksInput
                               name={`mark_${e.studentId}`}
-                              type="number"
                               min={0}
                               max={maxMark}
                               step="0.5"
                               defaultValue={ex ? Number(ex.rawMark) : ""}
                               placeholder="—"
-                              className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Comment">
                             <input
                               name={`comment_${e.studentId}`}
                               defaultValue={ex?.comment ?? ""}
                               placeholder="Optional comment"
-                              className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                              className="h-10 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:h-8 sm:text-sm dark:bg-input/30"
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Current">
                             {ex ? (
                               <span className="text-sm font-medium">
                                 {ex.grade ?? ""} {ex.grade ? "· " : ""}
@@ -146,7 +146,7 @@ export default async function MarksPage({
               <div className="flex justify-end">
                 <SubmitButton>Save marks</SubmitButton>
               </div>
-            </form>
+            </ActionForm>
           ) : (
             <p className="py-10 text-center text-sm text-muted-foreground">
               No students enrolled in {examSubject.class?.name ?? "this class"}.

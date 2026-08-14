@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/empty-state";
 import { DeleteButton } from "@/components/delete-button";
 import { EventDialog } from "@/components/events/event-dialog";
 import { createEvent, deleteEvent } from "@/lib/actions/school";
+import { BRAND_COLORS } from "@/lib/constants";
 
 export const metadata = { title: "Events" };
 
@@ -85,7 +86,7 @@ function EventCard({
 }: {
   event: { id: string; title: string; description: string | null; type: string; startDate: Date; endDate: Date | null; location: string | null; color: string | null };
   canDelete: boolean;
-  onDelete: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<unknown>;
   past?: boolean;
 }) {
   return (
@@ -93,7 +94,7 @@ function EventCard({
       <div className="mb-2 flex items-start justify-between gap-2">
         <div
           className="flex size-9 shrink-0 items-center justify-center rounded-lg text-white"
-          style={{ backgroundColor: event.color ?? "#1d4ed8" }}
+          style={{ backgroundColor: event.color ?? BRAND_COLORS.primary }}
         >
           <PartyPopperIcon className="size-4" />
         </div>

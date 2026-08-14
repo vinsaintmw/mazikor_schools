@@ -45,7 +45,7 @@ export function SubjectsTable({
 
   return (
     <div className="rounded-xl border bg-card">
-      <Table>
+      <Table className="table-cards">
         <TableHeader>
           <TableRow>
             <TableHead>Code</TableHead>
@@ -59,16 +59,18 @@ export function SubjectsTable({
         <TableBody>
           {list.rows.map((s) => (
             <TableRow key={s.id}>
-              <TableCell>
+              <TableCell data-label="Code">
                 <Badge variant="outline" className="font-mono">
                   {s.code}
                 </Badge>
               </TableCell>
-              <TableCell className="font-medium">{s.name}</TableCell>
-              <TableCell>{s.department?.name ?? "—"}</TableCell>
-              <TableCell>{Number(s.passMark)}%</TableCell>
-              <TableCell>{s._count.classLinks}</TableCell>
-              <TableCell>
+              <TableCell data-label="Subject" data-span="full" className="font-medium">
+                {s.name}
+              </TableCell>
+              <TableCell data-label="Department">{s.department?.name ?? "—"}</TableCell>
+              <TableCell data-label="Pass mark">{Number(s.passMark)}%</TableCell>
+              <TableCell data-label="Classes">{s._count.classLinks}</TableCell>
+              <TableCell data-label="Actions" data-span="full">
                 <div className="flex justify-end gap-1">
                   {canEdit ? (
                     <SubjectFormDialog

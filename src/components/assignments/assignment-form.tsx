@@ -11,14 +11,16 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect, TextAreaField } from "@/components/forms";
+import { toast } from "sonner";
 
 export function AssignmentFormDialog({
   action,
   subjects,
   classes,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<unknown>;
   subjects: { id: string; name: string }[];
   classes: { id: string; name: string }[];
 }) {
@@ -36,10 +38,11 @@ export function AssignmentFormDialog({
         <DialogHeader>
           <DialogTitle>New assignment</DialogTitle>
         </DialogHeader>
-        <form
-          action={async (formData) => {
-            await action(formData);
+        <ActionForm
+          action={action}
+          onSuccess={() => {
             setOpen(false);
+            toast.success("Assignment created");
           }}
           className="grid gap-4 sm:grid-cols-2"
         >
@@ -64,7 +67,7 @@ export function AssignmentFormDialog({
           <div className="flex justify-end sm:col-span-2">
             <SubmitButton>Create assignment</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </DialogContent>
     </Dialog>
   );

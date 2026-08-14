@@ -27,7 +27,17 @@ export default async function InvoicesPage({
   const { page, perPage, search, skip } = paginationDefaults(sp);
   const status = Array.isArray(sp.status) ? sp.status[0] : sp.status ?? "";
 
-  const include: Prisma.InvoiceInclude = { student: true, items: true, payments: true };
+  const select: Prisma.InvoiceSelect = {
+    id: true,
+    number: true,
+    status: true,
+    discount: true,
+    dueDate: true,
+    studentId: true,
+    student: { select: { firstName: true, middleName: true, lastName: true } },
+    items: { select: { amount: true } },
+    payments: { select: { amount: true } },
+  };
 
   async function loadMoreInvoices(nextPage: number) {
     "use server";
@@ -47,7 +57,7 @@ export default async function InvoicesPage({
             }
           : {}),
       },
-      include,
+      select,
       orderBy: { createdAt: "desc" },
       skip: (nextPage - 1) * perPage,
       take: perPage,
@@ -69,7 +79,7 @@ export default async function InvoicesPage({
   };
 
   const [invoices, total] = await Promise.all([
-    db.invoice.findMany({ where, include, orderBy: { createdAt: "desc" }, skip, take: perPage }),
+    db.invoice.findMany({ where, select, orderBy: { createdAt: "desc" }, skip, take: perPage }),
     db.invoice.count({ where }),
   ]);
 

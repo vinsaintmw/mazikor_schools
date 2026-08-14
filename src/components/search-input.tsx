@@ -46,7 +46,7 @@ export function SearchInput({
 
   return (
     <div className={cn("relative", className)}>
-      <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+      <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -54,7 +54,7 @@ export function SearchInput({
           if (e.key === "Enter") update(value);
         }}
         placeholder={placeholder}
-        className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent pl-8 pr-8 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:w-56"
+        className="h-10 w-full min-w-0 rounded-lg border border-input bg-transparent pl-9 pr-9 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:w-56"
       />
       {value ? (
         <button
@@ -63,10 +63,10 @@ export function SearchInput({
             setValue("");
             update("");
           }}
-          className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground"
           aria-label="Clear search"
         >
-          <XIcon className="size-3.5" />
+          <XIcon className="size-4" />
         </button>
       ) : null}
     </div>

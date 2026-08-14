@@ -9,6 +9,7 @@ import { PAYMENT_METHODS } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect } from "@/components/forms";
 import { StatusBadge } from "@/components/status-badge";
 import { recordPayment } from "@/lib/actions/finance";
@@ -150,7 +151,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               <CardDescription>Balance due: {formatMoney(balance)}</CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
-              <form action={recordPayment} className="grid gap-3 sm:grid-cols-2">
+              <ActionForm action={recordPayment} className="grid gap-3 sm:grid-cols-2" successLabel="Payment recorded">
                 <input type="hidden" name="invoiceId" value={invoice.id} />
                 <TextInput name="amount" label="Amount (MK)" type="number" min={1} step="0.01" required placeholder="0.00" />
                 <NativeSelect
@@ -166,7 +167,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                 <div className="flex items-end justify-end sm:col-span-2">
                   <SubmitButton>Record payment</SubmitButton>
                 </div>
-              </form>
+              </ActionForm>
             </CardContent>
           </Card>
         ) : null}

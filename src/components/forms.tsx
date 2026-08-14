@@ -1,12 +1,16 @@
+"use client";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useFieldError } from "@/components/form-field-error";
 
 export function Field({
   label,
   htmlFor,
   required,
   hint,
+  error,
   children,
   className,
 }: {
@@ -14,6 +18,7 @@ export function Field({
   htmlFor: string;
   required?: boolean;
   hint?: string;
+  error?: string;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -25,6 +30,11 @@ export function Field({
       </Label>
       {children}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {error ? (
+        <p role="alert" className="text-xs font-medium text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -57,6 +67,7 @@ export function TextInput({
   id?: string;
 }) {
   const inputId = id ?? name;
+  const fieldError = useFieldError(name);
   const input = (
     <Input
       id={inputId}
@@ -68,11 +79,12 @@ export function TextInput({
       step={step}
       min={min}
       max={max}
+      aria-invalid={fieldError ? true : undefined}
     />
   );
   if (!label) return input;
   return (
-    <Field label={label} htmlFor={inputId} required={required} hint={hint} className={className}>
+    <Field label={label} htmlFor={inputId} required={required} hint={hint} error={fieldError} className={className}>
       {input}
     </Field>
   );
@@ -102,6 +114,7 @@ export function NativeSelect({
   onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
 }) {
   const inputId = id ?? name;
+  const fieldError = useFieldError(name);
   const select = (
     <select
       id={inputId}
@@ -109,7 +122,8 @@ export function NativeSelect({
       defaultValue={defaultValue ?? ""}
       required={required}
       onChange={onChange}
-      className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+      aria-invalid={fieldError ? true : undefined}
+      className="h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-3 py-2 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:h-10 md:text-sm dark:bg-input/30 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
     >
       {placeholder ? <option value="">{placeholder}</option> : null}
       {options.map((opt) => {
@@ -125,7 +139,7 @@ export function NativeSelect({
   );
   if (!label) return select;
   return (
-    <Field label={label} htmlFor={inputId} required={required} hint={hint} className={className}>
+    <Field label={label} htmlFor={inputId} required={required} hint={hint} error={fieldError} className={className}>
       {select}
     </Field>
   );
@@ -150,8 +164,9 @@ export function TextAreaField({
   hint?: string;
   className?: string;
 }) {
+  const fieldError = useFieldError(name);
   return (
-    <Field label={label} htmlFor={name} required={required} hint={hint} className={className}>
+    <Field label={label} htmlFor={name} required={required} hint={hint} error={fieldError} className={className}>
       <textarea
         id={name}
         name={name}
@@ -159,7 +174,8 @@ export function TextAreaField({
         required={required}
         placeholder={placeholder}
         rows={rows}
-        className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+        aria-invalid={fieldError ? true : undefined}
+        className="w-full min-w-0 rounded-lg border border-input bg-transparent px-3 py-2.5 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
       />
     </Field>
   );

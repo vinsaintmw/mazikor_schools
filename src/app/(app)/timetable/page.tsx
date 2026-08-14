@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect } from "@/components/forms";
 import { EmptyState } from "@/components/empty-state";
 import { addTimetableEntry, deleteTimetableEntry } from "@/lib/actions/academics";
@@ -126,7 +127,9 @@ export default async function TimetablePage({
                             {entry.room ? <p className="text-xs text-muted-foreground">Room {entry.room}</p> : null}
                             {canManage ? (
                               <form
-                                action={deleteTimetableEntry.bind(null, entry.id)}
+                                action={async () => {
+                                  await deleteTimetableEntry(entry.id);
+                                }}
                                 className="absolute -top-1.5 -right-1.5 hidden group-hover:block"
                               >
                                 <Button type="submit" variant="destructive" size="icon-xs" aria-label="Remove entry">
@@ -164,7 +167,7 @@ export default async function TimetablePage({
             <CardDescription>Assign a subject and teacher to a period.</CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
-            <form action={addTimetableEntry} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <ActionForm action={addTimetableEntry} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" successLabel="Entry added">
               <input type="hidden" name="classId" value={activeClassId} />
               <input type="hidden" name="streamId" value={activeStreamId || ""} />
               <NativeSelect
@@ -205,7 +208,7 @@ export default async function TimetablePage({
                   Add entry
                 </SubmitButton>
               </div>
-            </form>
+            </ActionForm>
           </CardContent>
         </Card>
       ) : null}

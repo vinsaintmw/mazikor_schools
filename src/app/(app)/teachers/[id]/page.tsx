@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getSchoolId } from "@/lib/server-helpers";
-import { fullName, formatDate, formatMoney } from "@/lib/format";
+import { fullName, formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,8 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { initials } from "@/lib/format";
 import { DeleteButton } from "@/components/delete-button";
 import { deleteTeacher } from "@/lib/actions/people";
+import { SetBreadcrumbLabel } from "@/components/layout/set-breadcrumb-label";
 
-export const metadata = { title: "Teacher profile" };
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Teacher profile",
+};
 
 export default async function TeacherDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -39,6 +44,7 @@ export default async function TeacherDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
+      <SetBreadcrumbLabel path={`/teachers/${teacher.id}`} label={name} />
       <PageHeader
         title={name}
         description={`${teacher.employeeId} · ${teacher.specialization ?? "General"} · Joined ${formatDate(teacher.joiningDate)}`}
@@ -65,6 +71,13 @@ export default async function TeacherDetailPage({ params }: { params: Promise<{ 
           <AvatarFallback>{initials(name)}</AvatarFallback>
         </Avatar>
         <StatusBadge status={teacher.status} />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MiniStat label="Subjects" value={formatNumber(teacher.subjects.length)} />
+        <MiniStat label="Class teacher of" value={formatNumber(teacher.classTeacher.length)} />
+        <MiniStat label="Timetable slots" value={formatNumber(teacher.timetables.length)} />
+        <MiniStat label="Salary" value={formatMoney(Number(teacher.salary ?? 0))} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -159,5 +172,16 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
       <span className="text-muted-foreground">{label}</span>
       <span className="text-right font-medium">{value ?? "—"}</span>
     </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <Card>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+      </CardContent>
+    </Card>
   );
 }

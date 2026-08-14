@@ -42,7 +42,7 @@ export default async function ParentsPage({
             }
           : {}),
       },
-      include: { students: { include: { student: true } } },
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true, relationship: true, isEmergency: true, _count: { select: { students: true } } },
       orderBy: [{ lastName: "asc" }],
       skip: (nextPage - 1) * perPage,
       take: perPage,
@@ -66,7 +66,7 @@ export default async function ParentsPage({
   const [parents, total] = await Promise.all([
     db.parent.findMany({
       where,
-      include: { students: { include: { student: true } } },
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true, relationship: true, isEmergency: true, _count: { select: { students: true } } },
       orderBy: [{ lastName: "asc" }],
       skip,
       take: perPage,
@@ -103,7 +103,7 @@ export default async function ParentsPage({
         <EmptyState
           title="No parents found"
           description="Add parent details to link them with students."
-          action={canCreate ? { label: "New parent", href: "/parents/new" } : undefined}
+          action={canCreate ? { label: "Add Parent", href: "/parents/new" } : undefined}
           icon={<PlusIcon className="size-6" />}
         />
       )}

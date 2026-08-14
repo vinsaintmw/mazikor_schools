@@ -1,5 +1,7 @@
 import { createInvoice } from "@/lib/actions/finance";
+import { ActionForm } from "@/components/action-form";
 import { SubmitButton } from "@/components/submit-button";
+import { CancelButton } from "@/components/cancel-button";
 import { TextInput, NativeSelect, TextAreaField } from "@/components/forms";
 
 export function InvoiceForm({
@@ -10,7 +12,7 @@ export function InvoiceForm({
   terms: { id: string; name: string }[];
 }) {
   return (
-    <form action={createInvoice} className="space-y-6">
+    <ActionForm action={createInvoice} className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <NativeSelect
           name="studentId"
@@ -45,8 +47,9 @@ export function InvoiceForm({
         />
       </div>
       <div className="flex justify-end gap-2">
+        <CancelButton href="/invoices" />
         <SubmitButton>Create invoice</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }

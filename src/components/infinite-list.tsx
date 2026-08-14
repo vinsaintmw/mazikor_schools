@@ -27,15 +27,16 @@ export function useInfiniteList<T extends { id: string }>({
   const [error, setError] = useState(false);
   const busyRef = useRef(false);
 
-  const hasMore = rows.length < total;
-
-  useEffect(() => {
+  const [lastInitial, setLastInitial] = useState(initialRows);
+  if (lastInitial !== initialRows) {
+    setLastInitial(initialRows);
     setRows(initialRows);
     setPage(initialPage);
     setLoading(false);
     setError(false);
-    busyRef.current = false;
-  }, [initialRows, initialPage]);
+  }
+
+  const hasMore = rows.length < total;
 
   const loadNext = useCallback(async () => {
     if (busyRef.current || !hasMore) return;
@@ -108,9 +109,9 @@ export function InfiniteListFooter({
           <button
             type="button"
             onClick={loadNext}
-            className="inline-flex items-center gap-1 rounded-md border border-input px-2 py-0.5 text-xs font-medium transition-colors hover:bg-muted"
+            className="inline-flex items-center gap-1.5 rounded-md border border-input px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted"
           >
-            <RefreshCwIcon className="size-3" />
+            <RefreshCwIcon className="size-3.5" />
             Retry
           </button>
         </>

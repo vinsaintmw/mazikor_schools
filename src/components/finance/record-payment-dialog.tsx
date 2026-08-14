@@ -11,15 +11,17 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect } from "@/components/forms";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { todayISO } from "@/lib/format";
+import { toast } from "sonner";
 
 export function RecordPaymentDialog({
   action,
   invoices,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<unknown>;
   invoices: { id: string; number: string; studentName: string; amount: number; paid: number }[];
 }) {
   const [open, setOpen] = useState(false);
@@ -36,10 +38,11 @@ export function RecordPaymentDialog({
         <DialogHeader>
           <DialogTitle>Record payment</DialogTitle>
         </DialogHeader>
-        <form
-          action={async (formData) => {
-            await action(formData);
+        <ActionForm
+          action={action}
+          onSuccess={() => {
             setOpen(false);
+            toast.success("Payment recorded");
           }}
           className="grid gap-4 sm:grid-cols-2"
         >
@@ -62,7 +65,7 @@ export function RecordPaymentDialog({
           <div className="flex justify-end sm:col-span-2">
             <SubmitButton>Record payment</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </DialogContent>
     </Dialog>
   );

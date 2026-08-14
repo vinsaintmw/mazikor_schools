@@ -9,6 +9,7 @@ import { saveAttendance } from "@/lib/actions/academics";
 import { todayISO, formatDate, fullName } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { NativeSelect } from "@/components/forms";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -87,10 +88,10 @@ export default async function AttendancePage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form
+            <ActionForm
               action={saveAttendance}
               className="space-y-4"
-              // This form is submitted manually; statuses are native selects.
+              successLabel="Attendance saved"
             >
               <div className="grid gap-3 sm:grid-cols-3">
                 <NativeSelect
@@ -125,7 +126,7 @@ export default async function AttendancePage({
 
               {students.length ? (
                 <div className="rounded-lg border">
-                  <Table>
+                  <Table className="table-cards">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Student</TableHead>
@@ -138,16 +139,16 @@ export default async function AttendancePage({
                         const ex = existingByStudent.get(s.id);
                         return (
                           <TableRow key={s.id}>
-                            <TableCell>
+                            <TableCell data-label="Student" data-span="full">
                               <span className="font-medium">{fullName(s.firstName, s.middleName, s.lastName)}</span>
                               <span className="ml-2 font-mono text-xs text-muted-foreground">{s.admissionNumber}</span>
                             </TableCell>
-                            <TableCell>
+                            <TableCell data-label="Status">
                               {canManage ? (
                                 <select
                                   name={`status_${s.id}`}
                                   defaultValue={ex?.status ?? "PRESENT"}
-                                  className="h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                                  className="h-10 w-full rounded-lg border border-input bg-transparent px-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:h-8 sm:text-sm dark:bg-input/30"
                                 >
                                   {STATUSES.map((st) => (
                                     <option key={st} value={st}>
@@ -159,13 +160,13 @@ export default async function AttendancePage({
                                 <StatusBadge status={ex?.status ?? "PRESENT"} />
                               )}
                             </TableCell>
-                            <TableCell>
+                            <TableCell data-label="Note">
                               {canManage ? (
                                 <input
                                   name={`note_${s.id}`}
                                   defaultValue={ex?.note ?? ""}
                                   placeholder="Optional note"
-                                  className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                                  className="h-10 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:h-8 sm:text-sm dark:bg-input/30"
                                 />
                               ) : (
                                 <span className="text-sm text-muted-foreground">{ex?.note ?? "—"}</span>
@@ -188,7 +189,7 @@ export default async function AttendancePage({
                   <SubmitButton>Save attendance</SubmitButton>
                 </div>
               ) : null}
-            </form>
+            </ActionForm>
           </CardContent>
         </Card>
 

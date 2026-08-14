@@ -25,7 +25,7 @@ export function Pagination({
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 border-t pt-3">
+    <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-3">
       <p className="text-sm text-muted-foreground">
         Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
       </p>
@@ -34,7 +34,7 @@ export function Pagination({
           type="button"
           disabled={page <= 1}
           onClick={() => go(page - 1)}
-          className="inline-flex size-7 items-center justify-center rounded-md border border-input disabled:opacity-40"
+          className="inline-flex size-9 items-center justify-center rounded-md border border-input disabled:opacity-40"
           aria-label="Previous page"
         >
           <ChevronLeftIcon className="size-4" />
@@ -46,7 +46,7 @@ export function Pagination({
           type="button"
           disabled={page >= totalPages}
           onClick={() => go(page + 1)}
-          className="inline-flex size-7 items-center justify-center rounded-md border border-input disabled:opacity-40"
+          className="inline-flex size-9 items-center justify-center rounded-md border border-input disabled:opacity-40"
           aria-label="Next page"
         >
           <ChevronRightIcon className="size-4" />

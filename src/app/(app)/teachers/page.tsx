@@ -117,7 +117,7 @@ export default async function TeachersPage({
         <EmptyState
           title="No teachers found"
           description="Add teaching staff to build the academic team."
-          action={canCreate ? { label: "New teacher", href: "/teachers/new" } : undefined}
+          action={canCreate ? { label: "Add Teacher", href: "/teachers/new" } : undefined}
           icon={<PlusIcon className="size-6" />}
         />
       )}

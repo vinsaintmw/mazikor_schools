@@ -67,12 +67,12 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.645 0.156 160.578);
+  --chart-3: oklch(0.684 0.156 62.373);
+  --chart-4: oklch(0.58 0.253 17.777);
+  --chart-5: oklch(0.685 0.222 317.855);
+  --radius: 0.75rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -86,9 +86,9 @@
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.185 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.185 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
@@ -101,16 +101,16 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 264.182);
+  --chart-2: oklch(0.735 0.15 160.42);
+  --chart-3: oklch(0.75 0.147 61.89);
+  --chart-4: oklch(0.688 0.21 17.07);
+  --chart-5: oklch(0.736 0.186 318.32);
+  --sidebar: oklch(0.185 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.922 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
@@ -126,5 +126,112 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Prevent accidental page-level horizontal scrolling without breaking
+     sticky positioning (clip does not create a scroll container). */
+  html,
+  body {
+    overflow-x: clip;
+    -webkit-text-size-adjust: 100%;
+  }
+  @media (max-width: 640px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+  ::selection {
+    background-color: color-mix(in oklch, var(--foreground) 18%, transparent);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 20%, transparent) transparent;
+  }
+}
+
+@layer utilities {
+  .text-value {
+    @apply text-xl font-semibold tracking-tight tabular-nums sm:text-2xl;
+  }
+  .text-grade {
+    @apply inline-flex items-center rounded-md bg-primary/10 px-2.5 py-0.5 text-base font-bold tabular-nums text-primary;
+  }
+  .text-finance {
+    @apply font-semibold tabular-nums;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  @keyframes shine {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+}
+
+/* Convert complex tables into stacked cards on phones.
+   Add `table-cards` to the <Table> className and put `data-label`
+   attributes on each visible <TableCell> to power the card headings. */
+@media (max-width: 639.98px) {
+  [data-slot="table-container"]:has(.table-cards) {
+    overflow: visible;
+  }
+  .table-cards {
+    display: block;
+    width: 100%;
+  }
+  .table-cards [data-slot="table-header"],
+  .table-cards [data-slot="table-caption"] {
+    display: none;
+  }
+  .table-cards [data-slot="table-body"] {
+    display: block;
+  }
+  .table-cards [data-slot="table-row"] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem 1rem;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+  }
+  .table-cards [data-slot="table-cell"] {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .table-cards [data-slot="table-cell"]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.125rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    line-height: 1.25;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .table-cards [data-slot="table-cell"]:not([data-label])::before,
+  .table-cards [data-slot="table-cell"][data-label=""]::before {
+    display: none;
+  }
+  .table-cards [data-slot="table-cell"][data-span="full"] {
+    grid-column: 1 / -1;
+  }
+  .table-cards [data-slot="table-cell"].hidden {
+    display: none;
   }
 }

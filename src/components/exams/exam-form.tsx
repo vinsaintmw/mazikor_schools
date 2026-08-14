@@ -1,5 +1,7 @@
 import { createExam, updateExam } from "@/lib/actions/academics";
+import { ActionForm } from "@/components/action-form";
 import { SubmitButton } from "@/components/submit-button";
+import { CancelButton } from "@/components/cancel-button";
 import { TextInput, NativeSelect, TextAreaField } from "@/components/forms";
 import { EXAM_TYPES, getLabel } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
@@ -29,7 +31,7 @@ export function ExamForm({
   const action = exam ? updateExam.bind(null, exam.id) : createExam;
 
   return (
-    <form action={action} className="space-y-6">
+    <ActionForm action={action} className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <TextInput name="name" label="Exam name" required defaultValue={exam?.name} placeholder="e.g. Form 3 Mid-Term 2026" className="sm:col-span-2" />
         <NativeSelect
@@ -76,8 +78,9 @@ export function ExamForm({
         />
       </div>
       <div className="flex justify-end gap-2">
+        <CancelButton href={exam ? `/exams/${exam.id}` : "/exams"} />
         <SubmitButton>{mode === "create" ? "Create exam" : "Save changes"}</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }

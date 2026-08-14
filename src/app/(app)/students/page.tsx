@@ -40,7 +40,17 @@ export default async function StudentsPage({
     ...(status ? { status: status as never } : {}),
   };
 
-  const include: Prisma.StudentInclude = { stream: { include: { class: true } } };
+  const select: Prisma.StudentSelect = {
+    id: true,
+    firstName: true,
+    middleName: true,
+    lastName: true,
+    admissionNumber: true,
+    status: true,
+    gender: true,
+    phone: true,
+    stream: { select: { name: true } },
+  };
 
   async function loadMoreStudents(nextPage: number) {
     "use server";
@@ -61,7 +71,7 @@ export default async function StudentsPage({
           : {}),
         ...(status ? { status: status as never } : {}),
       },
-      include,
+      select,
       orderBy: { admissionNumber: "asc" },
       skip: (nextPage - 1) * perPage,
       take: perPage,
@@ -70,7 +80,7 @@ export default async function StudentsPage({
   }
 
   const [students, total] = await Promise.all([
-    db.student.findMany({ where, include, orderBy: { admissionNumber: "asc" }, skip, take: perPage }),
+    db.student.findMany({ where, select, orderBy: { admissionNumber: "asc" }, skip, take: perPage }),
     db.student.count({ where }),
   ]);
 
@@ -93,7 +103,7 @@ export default async function StudentsPage({
         <SearchInput placeholder="Search name or admission number…" />
         <Link
           href="/students"
-          className="inline-flex h-8 items-center rounded-lg border border-input bg-background px-2.5 text-sm font-medium transition-colors hover:bg-muted"
+          className="inline-flex h-10 items-center rounded-lg border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-muted"
         >
           All
         </Link>
@@ -101,7 +111,7 @@ export default async function StudentsPage({
           <Link
             key={s}
             href={`/students?status=${s}`}
-            className={`inline-flex h-8 items-center rounded-lg border px-2.5 text-sm font-medium transition-colors ${
+            className={`inline-flex h-10 items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
               status === s ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background hover:bg-muted"
             }`}
           >
@@ -122,7 +132,7 @@ export default async function StudentsPage({
         <EmptyState
           title="No students found"
           description="Add your first student to get started."
-          action={canCreate ? { label: "New student", href: "/students/new" } : undefined}
+          action={canCreate ? { label: "Add Student", href: "/students/new" } : undefined}
           icon={<PlusIcon className="size-6" />}
         />
       )}

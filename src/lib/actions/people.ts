@@ -1,628 +1,595 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { uid } from "@/lib/format";
 import { auditor } from "@/lib/audit";
-import {
-  assertPermission,
-  getSchoolId,
-  isSuperAdminSession,
-  toBool,
-  toDate,
-  toInt,
-  toStr,
-} from "@/lib/server-helpers";
-import { titleCase } from "@/lib/constants";
-import { createNotification } from "@/lib/notify";
+import { assertPermission, getSchoolId, toStr, toDate } from "@/lib/server-helpers";
+import { success } from "@/lib/action-result";
+import { enforceLimit } from "@/lib/limits";
+
+function fail(message?: string, fieldErrors?: Record<string, string>) {
+  return { ok: false as const, error: message ?? "An error occurred", fieldErrors };
+}
+
+function zodFieldErrors(issues: z.ZodIssue[]): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const issue of issues) {
+    const field = issue.path[0];
+    if (typeof field === "string" && !errors[field]) errors[field] = issue.message;
+  }
+  return errors;
+}
+
+// ------------------------------------------------------------------
+// Students
+// ------------------------------------------------------------------
 
 const studentSchema = z.object({
-  firstName: z.string().min(1),
+  firstName: z.string().min(1, "First name is required"),
   middleName: z.string().optional(),
-  lastName: z.string().min(1),
+  lastName: z.string().min(1, "Last name is required"),
   gender: z.enum(["MALE", "FEMALE"]),
   dateOfBirth: z.string().optional(),
-  nationality: z.string().optional(),
-  address: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
+  nationality: z.string().default("Malawian"),
   admissionNumber: z.string().optional(),
   admissionDate: z.string().optional(),
   streamId: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email("Invalid email address").or(z.literal("")).optional(),
   house: z.string().optional(),
   previousSchool: z.string().optional(),
-  medicalNotes: z.string().optional(),
-  status: z.enum(["ACTIVE", "GRADUATED", "TRANSFERRED", "SUSPENDED", "WITHDRAWN"]).optional(),
+  status: z.enum(["ACTIVE", "GRADUATED", "TRANSFERRED", "SUSPENDED", "WITHDRAWN"]).default("ACTIVE"),
 });
 
+function parseStudent(formData: FormData) {
+  return studentSchema.safeParse({
+    firstName: formData.get("firstName"),
+    middleName: formData.get("middleName"),
+    lastName: formData.get("lastName"),
+    gender: formData.get("gender"),
+    dateOfBirth: formData.get("dateOfBirth"),
+    nationality: formData.get("nationality"),
+    admissionNumber: formData.get("admissionNumber"),
+    admissionDate: formData.get("admissionDate"),
+    streamId: formData.get("streamId"),
+    phone: formData.get("phone"),
+    email: formData.get("email"),
+    house: formData.get("house"),
+    previousSchool: formData.get("previousSchool"),
+    status: formData.get("status"),
+  });
+}
+
 export async function createStudent(formData: FormData) {
+  const validation = parseStudent(formData);
+  if (!validation.success) return fail(validation.error.issues[0]?.message, zodFieldErrors(validation.error.issues));
+
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return fail("Unauthorized");
   assertPermission(session, "students.create");
   const schoolId = getSchoolId(session);
 
-  const parsed = studentSchema.safeParse({
-    firstName: toStr(formData.get("firstName")),
-    middleName: toStr(formData.get("middleName")),
-    lastName: toStr(formData.get("lastName")),
-    gender: toStr(formData.get("gender")),
-    dateOfBirth: toStr(formData.get("dateOfBirth")),
-    nationality: toStr(formData.get("nationality")) || "Malawian",
-    address: toStr(formData.get("address")),
-    phone: toStr(formData.get("phone")),
-    email: toStr(formData.get("email")),
-    admissionNumber: toStr(formData.get("admissionNumber")),
-    admissionDate: toStr(formData.get("admissionDate")),
-    streamId: toStr(formData.get("streamId")),
-    house: toStr(formData.get("house")),
-    previousSchool: toStr(formData.get("previousSchool")),
-    medicalNotes: toStr(formData.get("medicalNotes")),
-    status: toStr(formData.get("status")),
-  });
-  if (!parsed.success) throw new Error("Invalid student data: " + parsed.error.issues[0]?.message);
+  const limitError = await enforceLimit(schoolId, "students");
+  if (limitError) return fail(limitError);
 
-  const d = parsed.data;
-  const admissionNumber = d.admissionNumber || uid("STU");
+  const v = validation.data;
+  const admissionNumber = v.admissionNumber?.trim() || uid("STU");
+
+  const existing = await db.student.findFirst({ where: { schoolId, admissionNumber } });
+  if (existing) return fail("Admission number already exists.", { admissionNumber: "Admission number already exists." });
 
   const student = await db.student.create({
     data: {
       schoolId,
-      firstName: titleCase(d.firstName),
-      middleName: d.middleName ? titleCase(d.middleName) : null,
-      lastName: titleCase(d.lastName),
-      gender: d.gender,
-      dateOfBirth: toDate(d.dateOfBirth),
-      nationality: d.nationality || "Malawian",
-      address: d.address || null,
-      phone: d.phone || null,
-      email: d.email || null,
       admissionNumber,
-      admissionDate: toDate(d.admissionDate) ?? new Date(),
-      streamId: d.streamId || null,
-      house: d.house || null,
-      previousSchool: d.previousSchool || null,
-      medicalNotes: d.medicalNotes || null,
-      status: d.status ?? "ACTIVE",
+      firstName: v.firstName,
+      middleName: v.middleName?.trim() || undefined,
+      lastName: v.lastName,
+      gender: v.gender,
+      dateOfBirth: toDate(v.dateOfBirth) ?? undefined,
+      nationality: v.nationality,
+      admissionDate: toDate(v.admissionDate) ?? undefined,
+      streamId: v.streamId || undefined,
+      phone: v.phone?.trim() || undefined,
+      email: v.email?.trim().toLowerCase() || undefined,
+      house: v.house?.trim() || undefined,
+      previousSchool: v.previousSchool?.trim() || undefined,
+      status: v.status,
     },
   });
 
-  if (d.streamId) {
-    const stream = await db.stream.findUnique({ where: { id: d.streamId } });
-    if (stream) {
-      await db.enrollment.create({
-        data: {
-          schoolId,
-          studentId: student.id,
-          classId: stream.classId,
-          streamId: stream.id,
-          status: d.status ?? "ACTIVE",
-        },
-      });
-    }
-  }
-
-  await auditor(session).log({
-    action: "CREATE",
-    entity: "student",
-    entityId: student.id,
-    details: { name: student.firstName + " " + student.lastName },
-  });
-
+  await auditor(session).log({ action: "CREATE", entity: "student", entityId: student.id });
   revalidatePath("/students");
-  revalidatePath("/dashboard");
+  return success(student);
 }
 
-export async function updateStudent(studentId: string, formData: FormData) {
+export async function updateStudent(id: string, formData: FormData) {
+  const validation = parseStudent(formData);
+  if (!validation.success) return fail(validation.error.issues[0]?.message, zodFieldErrors(validation.error.issues));
+
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return fail("Unauthorized");
   assertPermission(session, "students.edit");
   const schoolId = getSchoolId(session);
 
-  const existing = await db.student.findFirst({ where: { id: studentId, schoolId } });
-  if (!existing) throw new Error("Student not found");
+  const current = await db.student.findFirst({ where: { id, schoolId } });
+  if (!current) return fail("Student not found");
 
-  const parsed = studentSchema.safeParse({
-    firstName: toStr(formData.get("firstName")),
-    middleName: toStr(formData.get("middleName")),
-    lastName: toStr(formData.get("lastName")),
-    gender: toStr(formData.get("gender")),
-    dateOfBirth: toStr(formData.get("dateOfBirth")),
-    nationality: toStr(formData.get("nationality")) || "Malawian",
-    address: toStr(formData.get("address")),
-    phone: toStr(formData.get("phone")),
-    email: toStr(formData.get("email")),
-    admissionNumber: toStr(formData.get("admissionNumber")),
-    admissionDate: toStr(formData.get("admissionDate")),
-    streamId: toStr(formData.get("streamId")),
-    house: toStr(formData.get("house")),
-    previousSchool: toStr(formData.get("previousSchool")),
-    medicalNotes: toStr(formData.get("medicalNotes")),
-    status: toStr(formData.get("status")),
-  });
-  if (!parsed.success) throw new Error("Invalid student data");
+  const v = validation.data;
+  const admissionNumber = v.admissionNumber?.trim() || current.admissionNumber;
 
-  const d = parsed.data;
+  const existing = await db.student.findFirst({ where: { schoolId, admissionNumber } });
+  if (existing && existing.id !== id)
+    return fail("Admission number already exists.", { admissionNumber: "Admission number already exists." });
+
   await db.student.update({
-    where: { id: studentId },
+    where: { id },
     data: {
-      firstName: titleCase(d.firstName),
-      middleName: d.middleName ? titleCase(d.middleName) : null,
-      lastName: titleCase(d.lastName),
-      gender: d.gender,
-      dateOfBirth: toDate(d.dateOfBirth),
-      nationality: d.nationality || "Malawian",
-      address: d.address || null,
-      phone: d.phone || null,
-      email: d.email || null,
-      admissionNumber: d.admissionNumber || existing.admissionNumber,
-      admissionDate: toDate(d.admissionDate) ?? existing.admissionDate,
-      streamId: d.streamId || null,
-      house: d.house || null,
-      previousSchool: d.previousSchool || null,
-      medicalNotes: d.medicalNotes || null,
-      status: d.status ?? existing.status,
+      firstName: v.firstName,
+      middleName: v.middleName?.trim() || undefined,
+      lastName: v.lastName,
+      gender: v.gender,
+      dateOfBirth: toDate(v.dateOfBirth) ?? undefined,
+      nationality: v.nationality,
+      admissionNumber,
+      admissionDate: toDate(v.admissionDate) ?? undefined,
+      streamId: v.streamId || undefined,
+      phone: v.phone?.trim() || undefined,
+      email: v.email?.trim().toLowerCase() || undefined,
+      house: v.house?.trim() || undefined,
+      previousSchool: v.previousSchool?.trim() || undefined,
+      status: v.status,
     },
   });
 
-  await auditor(session).log({
-    action: "UPDATE",
-    entity: "student",
-    entityId: studentId,
+  await auditor(session).log({ action: "UPDATE", entity: "student", entityId: id });
+  revalidatePath("/students");
+  revalidatePath(`/students/${id}`);
+  return success();
+}
+
+// ------------------------------------------------------------------
+// Parents
+// ------------------------------------------------------------------
+
+const parentSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  phone: z.string().min(1, "Phone is required"),
+  email: z.string().email("Invalid email address").or(z.literal("")).optional(),
+  address: z.string().optional(),
+  occupation: z.string().optional(),
+  relationship: z.string().default("Other"),
+  isEmergency: z.preprocess((v) => (v === "on" ? "on" : undefined), z.enum(["on"]).optional()),
+});
+
+function parseParent(formData: FormData) {
+  return parentSchema.safeParse({
+    firstName: formData.get("firstName"),
+    lastName: formData.get("lastName"),
+    phone: formData.get("phone"),
+    email: formData.get("email"),
+    address: formData.get("address"),
+    occupation: formData.get("occupation"),
+    relationship: formData.get("relationship"),
+    isEmergency: formData.get("isEmergency"),
   });
-  revalidatePath("/students");
-  revalidatePath(`/students/${studentId}`);
-  revalidatePath("/dashboard");
 }
 
-export async function deleteStudent(studentId: string) {
+export async function createParent(formData: FormData) {
+  const validation = parseParent(formData);
+  if (!validation.success) return fail(validation.error.issues[0]?.message, zodFieldErrors(validation.error.issues));
+
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "students.delete");
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "parents.create");
   const schoolId = getSchoolId(session);
 
-  const existing = await db.student.findFirst({ where: { id: studentId, schoolId } });
-  if (!existing) throw new Error("Student not found");
-
-  await db.student.delete({ where: { id: studentId } });
-  await auditor(session).log({ action: "DELETE", entity: "student", entityId: studentId });
-  revalidatePath("/students");
-}
-
-export async function addStudentNote(formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  const schoolId = getSchoolId(session);
-  const studentId = toStr(formData.get("studentId"));
-  const title = toStr(formData.get("title"));
-  const body = toStr(formData.get("body"));
-
-  if (!studentId || !title) throw new Error("Title and student are required");
-
-  const student = await db.student.findFirst({ where: { id: studentId, schoolId } });
-  if (!student) throw new Error("Student not found");
-
-  await db.studentNote.create({
+  const v = validation.data;
+  const parent = await db.parent.create({
     data: {
       schoolId,
-      studentId,
-      title,
-      body: body,
-      createdById: session.user.id,
+      firstName: v.firstName,
+      lastName: v.lastName,
+      phone: v.phone,
+      email: v.email?.trim() || undefined,
+      address: v.address?.trim() || undefined,
+      occupation: v.occupation?.trim() || undefined,
+      relationship: v.relationship || "Other",
+      isEmergency: v.isEmergency === "on",
     },
   });
-  revalidatePath(`/students/${studentId}`);
+
+  await auditor(session).log({ action: "CREATE", entity: "parent", entityId: parent.id });
+  revalidatePath("/parents");
+  return success(parent);
 }
+
+export async function updateParent(id: string, formData: FormData) {
+  const validation = parseParent(formData);
+  if (!validation.success) return fail(validation.error.issues[0]?.message, zodFieldErrors(validation.error.issues));
+
+  const session = await auth();
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "parents.edit");
+  const schoolId = getSchoolId(session);
+
+  const existing = await db.parent.findFirst({ where: { id, schoolId } });
+  if (!existing) return fail("Parent not found");
+
+  const v = validation.data;
+  await db.parent.update({
+    where: { id },
+    data: {
+      firstName: v.firstName,
+      lastName: v.lastName,
+      phone: v.phone,
+      email: v.email?.trim() || undefined,
+      address: v.address?.trim() || undefined,
+      occupation: v.occupation?.trim() || undefined,
+      relationship: v.relationship || "Other",
+      isEmergency: v.isEmergency === "on",
+    },
+  });
+
+  await auditor(session).log({ action: "UPDATE", entity: "parent", entityId: id });
+  revalidatePath("/parents");
+  return success();
+}
+
+// ------------------------------------------------------------------
+// Teachers
+// ------------------------------------------------------------------
+
+const teacherSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  gender: z.enum(["MALE", "FEMALE"]),
+  dateOfBirth: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email("Invalid email address").or(z.literal("")).optional(),
+  address: z.string().optional(),
+  qualification: z.string().optional(),
+  specialization: z.string().optional(),
+  joiningDate: z.string().optional(),
+  employmentType: z.enum(["FULL_TIME", "PART_TIME", "CONTRACT"]).default("FULL_TIME"),
+  salary: z.string().optional(),
+  status: z.enum(["ACTIVE", "ON_LEAVE", "RESIGNED", "TERMINATED"]).default("ACTIVE"),
+});
+
+function parseTeacher(formData: FormData) {
+  return teacherSchema.safeParse({
+    firstName: formData.get("firstName"),
+    lastName: formData.get("lastName"),
+    gender: formData.get("gender"),
+    dateOfBirth: formData.get("dateOfBirth"),
+    phone: formData.get("phone"),
+    email: formData.get("email"),
+    address: formData.get("address"),
+    qualification: formData.get("qualification"),
+    specialization: formData.get("specialization"),
+    joiningDate: formData.get("joiningDate"),
+    employmentType: formData.get("employmentType"),
+    salary: formData.get("salary"),
+    status: formData.get("status"),
+  });
+}
+
+export async function createTeacher(formData: FormData) {
+  const validation = parseTeacher(formData);
+  if (!validation.success) return fail(validation.error.issues[0]?.message, zodFieldErrors(validation.error.issues));
+
+  const session = await auth();
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "teachers.create");
+  const schoolId = getSchoolId(session);
+
+  const limitError = await enforceLimit(schoolId, "teachers");
+  if (limitError) return fail(limitError);
+
+  const v = validation.data;
+  const teacher = await db.teacher.create({
+    data: {
+      schoolId,
+      employeeId: uid("TEA"),
+      firstName: v.firstName,
+      lastName: v.lastName,
+      gender: v.gender,
+      dateOfBirth: toDate(v.dateOfBirth) ?? undefined,
+      phone: v.phone?.trim() || undefined,
+      email: v.email?.trim().toLowerCase() || undefined,
+      address: v.address?.trim() || undefined,
+      qualification: v.qualification?.trim() || undefined,
+      specialization: v.specialization?.trim() || undefined,
+      joiningDate: toDate(v.joiningDate) ?? undefined,
+      employmentType: v.employmentType,
+      salary: v.salary ? Number(v.salary) : undefined,
+      status: v.status,
+    },
+  });
+
+  await auditor(session).log({ action: "CREATE", entity: "teacher", entityId: teacher.id });
+  revalidatePath("/teachers");
+  return success(teacher);
+}
+
+export async function updateTeacher(id: string, formData: FormData) {
+  const validation = parseTeacher(formData);
+  if (!validation.success) return fail(validation.error.issues[0]?.message, zodFieldErrors(validation.error.issues));
+
+  const session = await auth();
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "teachers.edit");
+  const schoolId = getSchoolId(session);
+
+  const current = await db.teacher.findFirst({ where: { id, schoolId } });
+  if (!current) return fail("Teacher not found");
+
+  const v = validation.data;
+  await db.teacher.update({
+    where: { id },
+    data: {
+      firstName: v.firstName,
+      lastName: v.lastName,
+      gender: v.gender,
+      dateOfBirth: toDate(v.dateOfBirth) ?? undefined,
+      phone: v.phone?.trim() || undefined,
+      email: v.email?.trim().toLowerCase() || undefined,
+      address: v.address?.trim() || undefined,
+      qualification: v.qualification?.trim() || undefined,
+      specialization: v.specialization?.trim() || undefined,
+      joiningDate: toDate(v.joiningDate) ?? undefined,
+      employmentType: v.employmentType,
+      salary: v.salary ? Number(v.salary) : undefined,
+      status: v.status,
+    },
+  });
+
+  await auditor(session).log({ action: "UPDATE", entity: "teacher", entityId: id });
+  revalidatePath("/teachers");
+  revalidatePath(`/teachers/${id}`);
+  return success();
+}
+
+// ------------------------------------------------------------------
+// Staff
+// ------------------------------------------------------------------
+
+const staffSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  gender: z.enum(["MALE", "FEMALE"]),
+  phone: z.string().optional(),
+  email: z.string().email("Invalid email address").or(z.literal("")).optional(),
+  address: z.string().optional(),
+  position: z.string().optional(),
+  department: z.string().optional(),
+  joiningDate: z.string().optional(),
+  employmentType: z.enum(["FULL_TIME", "PART_TIME", "CONTRACT"]).default("FULL_TIME"),
+  salary: z.string().optional(),
+  status: z.enum(["ACTIVE", "ON_LEAVE", "RESIGNED", "TERMINATED"]).default("ACTIVE"),
+});
+
+function parseStaff(formData: FormData) {
+  return staffSchema.safeParse({
+    firstName: formData.get("firstName"),
+    lastName: formData.get("lastName"),
+    gender: formData.get("gender"),
+    phone: formData.get("phone"),
+    email: formData.get("email"),
+    address: formData.get("address"),
+    position: formData.get("position"),
+    department: formData.get("department"),
+    joiningDate: formData.get("joiningDate"),
+    employmentType: formData.get("employmentType"),
+    salary: formData.get("salary"),
+    status: formData.get("status"),
+  });
+}
+
+export async function createStaff(formData: FormData) {
+  const validation = parseStaff(formData);
+  if (!validation.success) return fail(validation.error.issues[0]?.message, zodFieldErrors(validation.error.issues));
+
+  const session = await auth();
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "staff.create");
+  const schoolId = getSchoolId(session);
+
+  const limitError = await enforceLimit(schoolId, "staff");
+  if (limitError) return fail(limitError);
+
+  const v = validation.data;
+  const staff = await db.staff.create({
+    data: {
+      schoolId,
+      employeeId: uid("STA"),
+      firstName: v.firstName,
+      lastName: v.lastName,
+      gender: v.gender,
+      phone: v.phone?.trim() || undefined,
+      email: v.email?.trim().toLowerCase() || undefined,
+      address: v.address?.trim() || undefined,
+      position: v.position?.trim() || undefined,
+      department: v.department?.trim() || undefined,
+      joiningDate: toDate(v.joiningDate) ?? undefined,
+      employmentType: v.employmentType,
+      salary: v.salary ? Number(v.salary) : undefined,
+      status: v.status,
+    },
+  });
+
+  await auditor(session).log({ action: "CREATE", entity: "staff", entityId: staff.id });
+  revalidatePath("/staff");
+  return success(staff);
+}
+
+export async function updateStaff(id: string, formData: FormData) {
+  const validation = parseStaff(formData);
+  if (!validation.success) return fail(validation.error.issues[0]?.message, zodFieldErrors(validation.error.issues));
+
+  const session = await auth();
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "staff.edit");
+  const schoolId = getSchoolId(session);
+
+  const current = await db.staff.findFirst({ where: { id, schoolId } });
+  if (!current) return fail("Staff member not found");
+
+  const v = validation.data;
+  await db.staff.update({
+    where: { id },
+    data: {
+      firstName: v.firstName,
+      lastName: v.lastName,
+      gender: v.gender,
+      phone: v.phone?.trim() || undefined,
+      email: v.email?.trim().toLowerCase() || undefined,
+      address: v.address?.trim() || undefined,
+      position: v.position?.trim() || undefined,
+      department: v.department?.trim() || undefined,
+      joiningDate: toDate(v.joiningDate) ?? undefined,
+      employmentType: v.employmentType,
+      salary: v.salary ? Number(v.salary) : undefined,
+      status: v.status,
+    },
+  });
+
+  await auditor(session).log({ action: "UPDATE", entity: "staff", entityId: id });
+  revalidatePath("/staff");
+  return success();
+}
+
+// ------------------------------------------------------------------
+// Delete operations
+// ------------------------------------------------------------------
+
+export async function deleteParent(id: string, _formData?: FormData) {
+  const session = await auth();
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "parents.delete");
+  const schoolId = getSchoolId(session);
+  const existing = await db.parent.findFirst({ where: { id, schoolId } });
+  if (!existing) return fail("Parent not found");
+  await db.parent.delete({ where: { id } });
+  await auditor(session).log({ action: "DELETE", entity: "parent", entityId: id });
+  revalidatePath("/parents");
+  return success();
+}
+
+export async function deleteStaff(id: string, _formData?: FormData) {
+  const session = await auth();
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "staff.delete");
+  const schoolId = getSchoolId(session);
+  const existing = await db.staff.findFirst({ where: { id, schoolId } });
+  if (!existing) return fail("Staff member not found");
+  await db.staff.delete({ where: { id } });
+  await auditor(session).log({ action: "DELETE", entity: "staff", entityId: id });
+  revalidatePath("/staff");
+  return success();
+}
+
+export async function deleteTeacher(id: string, _formData?: FormData) {
+  const session = await auth();
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "teachers.delete");
+  const schoolId = getSchoolId(session);
+  const existing = await db.teacher.findFirst({ where: { id, schoolId } });
+  if (!existing) return fail("Teacher not found");
+  await db.teacher.delete({ where: { id } });
+  await auditor(session).log({ action: "DELETE", entity: "teacher", entityId: id });
+  revalidatePath("/teachers");
+  return success();
+}
+
+export async function deleteStudent(id: string, _formData?: FormData) {
+  const session = await auth();
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "students.delete");
+  const schoolId = getSchoolId(session);
+  const existing = await db.student.findFirst({ where: { id, schoolId } });
+  if (!existing) return fail("Student not found");
+  await db.student.delete({ where: { id } });
+  await auditor(session).log({ action: "DELETE", entity: "student", entityId: id });
+  revalidatePath("/students");
+  return success();
+}
+
+// ------------------------------------------------------------------
+// Student relationships and notes
+// ------------------------------------------------------------------
 
 export async function linkParent(studentId: string, formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return fail("Unauthorized");
   assertPermission(session, "parents.edit");
   const schoolId = getSchoolId(session);
+
   const parentId = toStr(formData.get("parentId"));
-  if (!parentId) throw new Error("Select a parent");
+  if (!parentId) return fail("Parent is required");
 
   const parent = await db.parent.findFirst({ where: { id: parentId, schoolId } });
-  if (!parent) throw new Error("Parent not found");
+  if (!parent) return fail("Parent not found");
+
+  const student = await db.student.findFirst({ where: { id: studentId, schoolId } });
+  if (!student) return fail("Student not found");
 
   await db.studentParent.upsert({
     where: { studentId_parentId: { studentId, parentId } },
     create: { schoolId, studentId, parentId },
     update: {},
   });
+
+  await auditor(session).log({ action: "UPDATE", entity: "student", entityId: studentId });
   revalidatePath(`/students/${studentId}`);
+  return success();
 }
 
-export async function unlinkParent(studentId: string, parentId: string) {
+export async function unlinkParent(studentId: string, parentId: string, _formData?: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  const schoolId = getSchoolId(session);
-  await db.studentParent.deleteMany({ where: { studentId, parentId, schoolId } });
-  revalidatePath(`/students/${studentId}`);
-}
-
-const parentSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  phone: z.string().min(1),
-  email: z.string().email().optional().or(z.literal("")),
-  address: z.string().optional(),
-  occupation: z.string().optional(),
-  relationship: z.string().min(1),
-  isEmergency: z.string().optional(),
-});
-
-export async function createParent(formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "parents.create");
-  const schoolId = getSchoolId(session);
-
-  const parsed = parentSchema.safeParse({
-    firstName: toStr(formData.get("firstName")),
-    lastName: toStr(formData.get("lastName")),
-    phone: toStr(formData.get("phone")),
-    email: toStr(formData.get("email")),
-    address: toStr(formData.get("address")),
-    occupation: toStr(formData.get("occupation")),
-    relationship: toStr(formData.get("relationship")),
-    isEmergency: toStr(formData.get("isEmergency")),
-  });
-  if (!parsed.success) throw new Error("Invalid parent data");
-
-  const d = parsed.data;
-  const parent = await db.parent.create({
-    data: {
-      schoolId,
-      firstName: titleCase(d.firstName),
-      lastName: titleCase(d.lastName),
-      phone: d.phone,
-      email: d.email || null,
-      address: d.address || null,
-      occupation: d.occupation || null,
-      relationship: d.relationship,
-      isEmergency: toBool(d.isEmergency),
-    },
-  });
-  await auditor(session).log({ action: "CREATE", entity: "parent", entityId: parent.id });
-  revalidatePath("/parents");
-}
-
-export async function updateParent(parentId: string, formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return fail("Unauthorized");
   assertPermission(session, "parents.edit");
   const schoolId = getSchoolId(session);
 
-  const existing = await db.parent.findFirst({ where: { id: parentId, schoolId } });
-  if (!existing) throw new Error("Parent not found");
+  await db.studentParent.deleteMany({ where: { studentId, parentId, schoolId } });
 
-  const parsed = parentSchema.safeParse({
-    firstName: toStr(formData.get("firstName")),
-    lastName: toStr(formData.get("lastName")),
-    phone: toStr(formData.get("phone")),
-    email: toStr(formData.get("email")),
-    address: toStr(formData.get("address")),
-    occupation: toStr(formData.get("occupation")),
-    relationship: toStr(formData.get("relationship")),
-    isEmergency: toStr(formData.get("isEmergency")),
-  });
-  if (!parsed.success) throw new Error("Invalid parent data");
-
-  const d = parsed.data;
-  await db.parent.update({
-    where: { id: parentId },
-    data: {
-      firstName: titleCase(d.firstName),
-      lastName: titleCase(d.lastName),
-      phone: d.phone,
-      email: d.email || null,
-      address: d.address || null,
-      occupation: d.occupation || null,
-      relationship: d.relationship,
-      isEmergency: toBool(d.isEmergency),
-    },
-  });
-  await auditor(session).log({ action: "UPDATE", entity: "parent", entityId: parentId });
-  revalidatePath("/parents");
+  await auditor(session).log({ action: "UPDATE", entity: "student", entityId: studentId });
+  revalidatePath(`/students/${studentId}`);
+  return success();
 }
 
-export async function deleteParent(parentId: string) {
+export async function addStudentNote(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "parents.delete");
-  const schoolId = getSchoolId(session);
-  const existing = await db.parent.findFirst({ where: { id: parentId, schoolId } });
-  if (!existing) throw new Error("Parent not found");
-  await db.parent.delete({ where: { id: parentId } });
-  await auditor(session).log({ action: "DELETE", entity: "parent", entityId: parentId });
-  revalidatePath("/parents");
-}
-
-const teacherSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  gender: z.enum(["MALE", "FEMALE"]),
-  dateOfBirth: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
-  address: z.string().optional(),
-  qualification: z.string().optional(),
-  specialization: z.string().optional(),
-  joiningDate: z.string().optional(),
-  employmentType: z.enum(["FULL_TIME", "PART_TIME", "CONTRACT"]).optional(),
-  salary: z.string().optional(),
-  status: z.enum(["ACTIVE", "ON_LEAVE", "RESIGNED", "TERMINATED"]).optional(),
-});
-
-export async function createTeacher(formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "teachers.create");
+  if (!session?.user) return fail("Unauthorized");
+  assertPermission(session, "students.view");
   const schoolId = getSchoolId(session);
 
-  const parsed = teacherSchema.safeParse({
-    firstName: toStr(formData.get("firstName")),
-    lastName: toStr(formData.get("lastName")),
-    gender: toStr(formData.get("gender")),
-    dateOfBirth: toStr(formData.get("dateOfBirth")),
-    phone: toStr(formData.get("phone")),
-    email: toStr(formData.get("email")),
-    address: toStr(formData.get("address")),
-    qualification: toStr(formData.get("qualification")),
-    specialization: toStr(formData.get("specialization")),
-    joiningDate: toStr(formData.get("joiningDate")),
-    employmentType: toStr(formData.get("employmentType")),
-    salary: toStr(formData.get("salary")),
-    status: toStr(formData.get("status")),
-  });
-  if (!parsed.success) throw new Error("Invalid teacher data");
+  const studentId = toStr(formData.get("studentId"));
+  const title = toStr(formData.get("title"));
+  const body = toStr(formData.get("body"));
+  const userId = session.user.id;
+  if (!userId) return fail("Unauthorized");
+  if (!studentId) return fail("Student is required");
+  if (!title) return fail("Note title is required");
 
-  const d = parsed.data;
-  const employeeId = uid("TCH");
+  const student = await db.student.findFirst({ where: { id: studentId, schoolId } });
+  if (!student) return fail("Student not found");
 
-  const teacher = await db.teacher.create({
+  await db.studentNote.create({
     data: {
       schoolId,
-      employeeId,
-      firstName: titleCase(d.firstName),
-      lastName: titleCase(d.lastName),
-      gender: d.gender,
-      dateOfBirth: toDate(d.dateOfBirth),
-      phone: d.phone || null,
-      email: d.email || null,
-      address: d.address || null,
-      qualification: d.qualification || null,
-      specialization: d.specialization || null,
-      joiningDate: toDate(d.joiningDate),
-      employmentType: d.employmentType ?? "FULL_TIME",
-      salary: d.salary ? Number(d.salary) : 0,
-      status: d.status ?? "ACTIVE",
+      studentId,
+      title,
+      body: body || "",
+      createdById: userId,
     },
   });
-  await auditor(session).log({ action: "CREATE", entity: "teacher", entityId: teacher.id });
-  revalidatePath("/teachers");
-}
 
-export async function updateTeacher(teacherId: string, formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "teachers.edit");
-  const schoolId = getSchoolId(session);
-
-  const existing = await db.teacher.findFirst({ where: { id: teacherId, schoolId } });
-  if (!existing) throw new Error("Teacher not found");
-
-  const parsed = teacherSchema.safeParse({
-    firstName: toStr(formData.get("firstName")),
-    lastName: toStr(formData.get("lastName")),
-    gender: toStr(formData.get("gender")),
-    dateOfBirth: toStr(formData.get("dateOfBirth")),
-    phone: toStr(formData.get("phone")),
-    email: toStr(formData.get("email")),
-    address: toStr(formData.get("address")),
-    qualification: toStr(formData.get("qualification")),
-    specialization: toStr(formData.get("specialization")),
-    joiningDate: toStr(formData.get("joiningDate")),
-    employmentType: toStr(formData.get("employmentType")),
-    salary: toStr(formData.get("salary")),
-    status: toStr(formData.get("status")),
-  });
-  if (!parsed.success) throw new Error("Invalid teacher data");
-
-  const d = parsed.data;
-  await db.teacher.update({
-    where: { id: teacherId },
-    data: {
-      firstName: titleCase(d.firstName),
-      lastName: titleCase(d.lastName),
-      gender: d.gender,
-      dateOfBirth: toDate(d.dateOfBirth),
-      phone: d.phone || null,
-      email: d.email || null,
-      address: d.address || null,
-      qualification: d.qualification || null,
-      specialization: d.specialization || null,
-      joiningDate: toDate(d.joiningDate),
-      employmentType: d.employmentType ?? existing.employmentType,
-      salary: d.salary ? Number(d.salary) : existing.salary,
-      status: d.status ?? existing.status,
-    },
-  });
-  await auditor(session).log({ action: "UPDATE", entity: "teacher", entityId: teacherId });
-  revalidatePath("/teachers");
-  revalidatePath(`/teachers/${teacherId}`);
-}
-
-export async function deleteTeacher(teacherId: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "teachers.delete");
-  const schoolId = getSchoolId(session);
-  const existing = await db.teacher.findFirst({ where: { id: teacherId, schoolId } });
-  if (!existing) throw new Error("Teacher not found");
-  await db.teacher.delete({ where: { id: teacherId } });
-  await auditor(session).log({ action: "DELETE", entity: "teacher", entityId: teacherId });
-  revalidatePath("/teachers");
-}
-
-const staffSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  gender: z.enum(["MALE", "FEMALE"]),
-  phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
-  address: z.string().optional(),
-  position: z.string().optional(),
-  department: z.string().optional(),
-  joiningDate: z.string().optional(),
-  employmentType: z.enum(["FULL_TIME", "PART_TIME", "CONTRACT"]).optional(),
-  salary: z.string().optional(),
-  status: z.enum(["ACTIVE", "ON_LEAVE", "RESIGNED", "TERMINATED"]).optional(),
-});
-
-export async function createStaff(formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "staff.create");
-  const schoolId = getSchoolId(session);
-
-  const parsed = staffSchema.safeParse({
-    firstName: toStr(formData.get("firstName")),
-    lastName: toStr(formData.get("lastName")),
-    gender: toStr(formData.get("gender")),
-    phone: toStr(formData.get("phone")),
-    email: toStr(formData.get("email")),
-    address: toStr(formData.get("address")),
-    position: toStr(formData.get("position")),
-    department: toStr(formData.get("department")),
-    joiningDate: toStr(formData.get("joiningDate")),
-    employmentType: toStr(formData.get("employmentType")),
-    salary: toStr(formData.get("salary")),
-    status: toStr(formData.get("status")),
-  });
-  if (!parsed.success) throw new Error("Invalid staff data");
-
-  const d = parsed.data;
-  const staff = await db.staff.create({
-    data: {
-      schoolId,
-      employeeId: uid("STF"),
-      firstName: titleCase(d.firstName),
-      lastName: titleCase(d.lastName),
-      gender: d.gender,
-      phone: d.phone || null,
-      email: d.email || null,
-      address: d.address || null,
-      position: d.position || null,
-      department: d.department || null,
-      joiningDate: toDate(d.joiningDate),
-      employmentType: d.employmentType ?? "FULL_TIME",
-      salary: d.salary ? Number(d.salary) : 0,
-      status: d.status ?? "ACTIVE",
-    },
-  });
-  await auditor(session).log({ action: "CREATE", entity: "staff", entityId: staff.id });
-  revalidatePath("/staff");
-}
-
-export async function updateStaff(staffId: string, formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "staff.edit");
-  const schoolId = getSchoolId(session);
-
-  const existing = await db.staff.findFirst({ where: { id: staffId, schoolId } });
-  if (!existing) throw new Error("Staff not found");
-
-  const parsed = staffSchema.safeParse({
-    firstName: toStr(formData.get("firstName")),
-    lastName: toStr(formData.get("lastName")),
-    gender: toStr(formData.get("gender")),
-    phone: toStr(formData.get("phone")),
-    email: toStr(formData.get("email")),
-    address: toStr(formData.get("address")),
-    position: toStr(formData.get("position")),
-    department: toStr(formData.get("department")),
-    joiningDate: toStr(formData.get("joiningDate")),
-    employmentType: toStr(formData.get("employmentType")),
-    salary: toStr(formData.get("salary")),
-    status: toStr(formData.get("status")),
-  });
-  if (!parsed.success) throw new Error("Invalid staff data");
-
-  const d = parsed.data;
-  await db.staff.update({
-    where: { id: staffId },
-    data: {
-      firstName: titleCase(d.firstName),
-      lastName: titleCase(d.lastName),
-      gender: d.gender,
-      phone: d.phone || null,
-      email: d.email || null,
-      address: d.address || null,
-      position: d.position || null,
-      department: d.department || null,
-      joiningDate: toDate(d.joiningDate),
-      employmentType: d.employmentType ?? existing.employmentType,
-      salary: d.salary ? Number(d.salary) : existing.salary,
-      status: d.status ?? existing.status,
-    },
-  });
-  await auditor(session).log({ action: "UPDATE", entity: "staff", entityId: staffId });
-  revalidatePath("/staff");
-}
-
-export async function deleteStaff(staffId: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "staff.delete");
-  const schoolId = getSchoolId(session);
-  const existing = await db.staff.findFirst({ where: { id: staffId, schoolId } });
-  if (!existing) throw new Error("Staff not found");
-  await db.staff.delete({ where: { id: staffId } });
-  await auditor(session).log({ action: "DELETE", entity: "staff", entityId: staffId });
-  revalidatePath("/staff");
-}
-
-export async function toggleUserActive(userId: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "users.manage");
-  const user = await db.user.findUnique({ where: { id: userId } });
-  if (!user) throw new Error("User not found");
-  if (user.id === session.user.id) throw new Error("You cannot deactivate your own account");
-  await db.user.update({ where: { id: userId }, data: { isActive: !user.isActive } });
-  await auditor(session).log({ action: "TOGGLE", entity: "user", entityId: userId });
-  revalidatePath("/admin/users");
-  revalidatePath("/settings");
-}
-
-export async function notifyStudents(streamId: string | null, message: string) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  assertPermission(session, "notices.manage");
-  const schoolId = getSchoolId(session);
-
-  const students = await db.student.findMany({
-    where: { schoolId, status: "ACTIVE", ...(streamId ? { streamId } : {}) },
-    include: { parents: { include: { parent: true } } },
-  });
-
-  for (const s of students) {
-    const title = "School announcement";
-    for (const sp of s.parents) {
-      if (sp.parent.phone) {
-        await createNotification({
-          schoolId,
-          userId: sp.parent.userId ?? session.user.id,
-          title,
-          body: message,
-          link: "/notices",
-        });
-      }
-    }
-  }
-  revalidatePath("/notices");
+  await auditor(session).log({ action: "CREATE", entity: "student_note", entityId: studentId });
+  revalidatePath(`/students/${studentId}`);
+  return success();
 }

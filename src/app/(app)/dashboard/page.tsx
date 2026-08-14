@@ -5,6 +5,7 @@ import {
   GraduationCapIcon,
   UserCogIcon,
   WalletIcon,
+  ReceiptIcon,
   AlertTriangleIcon,
   CalendarDaysIcon,
   MegaphoneIcon,
@@ -22,7 +23,11 @@ import { startOfDay, endOfDay } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { RevenueChart } from "./revenue-chart";
 
-export const metadata = { title: "Dashboard" };
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+};
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -43,70 +48,112 @@ export default async function DashboardPage() {
   ]);
 
   const enrollmentByClass = classes.map((c) => ({
+    id: c.id,
     name: c.name,
     students: c._count.enrollments,
   }));
 
-  const recentResults = await db.result.findMany({
-    where: { schoolId },
-    orderBy: { updatedAt: "desc" },
-    take: 8,
-    include: { student: { select: { firstName: true, lastName: true, admissionNumber: true } }, exam: { select: { name: true } }, examSubject: { include: { subject: true } } },
-  });
+  const recentResults = can(session, "results.view")
+    ? await db.result.findMany({
+        where: { schoolId },
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        include: { student: { select: { firstName: true, lastName: true, admissionNumber: true } }, exam: { select: { name: true } }, examSubject: { include: { subject: true } } },
+      })
+    : [];
 
-  const upcomingEvents = await db.event.findMany({
-    where: { schoolId, startDate: { gte: today } },
-    orderBy: { startDate: "asc" },
-    take: 5,
-  });
-
-  const recentNotices = await db.notice.findMany({
-    where: { schoolId, expiryDate: { gte: today }, publishDate: { lte: today } },
-    orderBy: { publishDate: "desc" },
-    take: 5,
-  });
+  const [upcomingEvents, recentNotices] = await Promise.all([
+    db.event.findMany({
+      where: { schoolId, startDate: { gte: today } },
+      orderBy: { startDate: "asc" },
+      take: 5,
+    }),
+    db.notice.findMany({
+      where: { schoolId, expiryDate: { gte: today }, publishDate: { lte: today } },
+      orderBy: { publishDate: "desc" },
+      take: 5,
+    }),
+  ]);
 
   let revenueThisTerm = 0;
   let unpaidCount = 0;
+  let outstandingBalance = 0;
   let attendanceToday = 0;
   let attendanceTotal = 0;
+  let paymentChart: { month: string; revenue: number }[] = [];
+
+  const currentTerm = can(session, "payments.view")
+    ? await db.term.findFirst({ where: { schoolId, isCurrent: true }, include: { academicYear: true } })
+    : null;
 
   if (can(session, "payments.view")) {
-    const currentTerm = await db.term.findFirst({ where: { schoolId, isCurrent: true } });
-    const payments = await db.payment.aggregate({
-      where: { schoolId, date: { gte: currentTerm?.startDate ?? startOfDay(today) } },
-      _sum: { amount: true },
-    });
-    revenueThisTerm = Number(payments._sum.amount ?? 0);
+    const academicYearStart = currentTerm?.academicYear?.startDate ?? startOfDay(today);
+    const academicYearEnd = currentTerm?.academicYear?.endDate ?? endOfDay(today);
+    const [paymentsAgg, monthRevenue] = await Promise.all([
+      db.payment.aggregate({
+        where: {
+          schoolId,
+          date: { gte: currentTerm?.startDate ?? startOfDay(today) },
+        },
+        _sum: { amount: true },
+      }),
+      db.$queryRaw<Array<{ month: string; revenue: number }>>`
+        SELECT to_char(date_trunc('month', "date"), 'Mon') AS month,
+               COALESCE(SUM(amount), 0)::float8 AS revenue
+        FROM payment
+        WHERE "schoolId" = ${schoolId}
+          AND "date" >= ${academicYearStart}
+          AND "date" <= ${academicYearEnd}
+        GROUP BY 1
+      `,
+    ]);
+    revenueThisTerm = Number(paymentsAgg._sum.amount ?? 0);
+    const monthTotals = new Map(monthRevenue.map((m) => [m.month, Number(m.revenue)]));
+    const monthsOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    paymentChart = monthsOrder.map((m) => ({ month: m, revenue: monthTotals.get(m) ?? 0 }));
   }
 
   if (can(session, "invoices.view")) {
-    unpaidCount = await db.invoice.count({
-      where: { schoolId, status: { in: ["UNPAID", "OVERDUE"] } },
-    });
+    const [invoiceCount, itemsAgg, discountAgg, paidAgg] = await Promise.all([
+      db.invoice.count({ where: { schoolId, status: { in: ["UNPAID", "OVERDUE"] } } }),
+      db.invoiceItem.aggregate({
+        where: { invoice: { schoolId, status: { in: ["UNPAID", "OVERDUE"] } } },
+        _sum: { amount: true },
+      }),
+      db.invoice.aggregate({
+        where: { schoolId, status: { in: ["UNPAID", "OVERDUE"] } },
+        _sum: { discount: true },
+      }),
+      db.payment.aggregate({
+        where: { invoice: { schoolId, status: { in: ["UNPAID", "OVERDUE"] } } },
+        _sum: { amount: true },
+      }),
+    ]);
+    unpaidCount = invoiceCount;
+    outstandingBalance = Math.max(
+      0,
+      Number(itemsAgg._sum.amount ?? 0) -
+        Number(discountAgg._sum.discount ?? 0) -
+        Number(paidAgg._sum.amount ?? 0)
+    );
   }
 
   if (can(session, "attendance.view")) {
-    const attendance = await db.attendance.findMany({
-      where: { schoolId, date: { gte: startOfDay(today), lte: endOfDay(today) } },
-      select: { status: true },
-    });
-    attendanceTotal = attendance.length;
-    attendanceToday = attendance.filter((a) => a.status === "PRESENT" || a.status === "EXCUSED").length;
+    const [total, present] = await Promise.all([
+      db.attendance.count({
+        where: { schoolId, date: { gte: startOfDay(today), lte: endOfDay(today) } },
+      }),
+      db.attendance.count({
+        where: {
+          schoolId,
+          date: { gte: startOfDay(today), lte: endOfDay(today) },
+          status: { in: ["PRESENT", "EXCUSED"] },
+        },
+      }),
+    ]);
+    attendanceTotal = total;
+    attendanceToday = present;
   }
-
-  const paymentsByMonth = await db.payment.findMany({
-    where: { schoolId },
-    select: { amount: true, date: true },
-    orderBy: { date: "asc" },
-  });
-  const monthTotals = new Map<string, number>();
-  for (const p of paymentsByMonth) {
-    const key = new Date(p.date).toLocaleString("en", { month: "short" });
-    monthTotals.set(key, (monthTotals.get(key) ?? 0) + Number(p.amount));
-  }
-  const monthsOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const paymentChart = monthsOrder.map((m) => ({ month: m, revenue: monthTotals.get(m) ?? 0 }));
 
   const permissionGranted = (perms: string[]) => perms.some((p) => can(session, p));
 
@@ -139,29 +186,49 @@ export default async function DashboardPage() {
           sub="Non-teaching"
           href="/staff"
         />
+        {can(session, "attendance.view") ? (
+          <StatCard
+            icon={<CalendarDaysIcon className="size-4" />}
+            label="Attendance today"
+            value={attendanceTotal > 0 ? `${Math.round((attendanceToday / attendanceTotal) * 100)}%` : "—"}
+            sub={`${formatNumber(attendanceTotal)} record${attendanceTotal === 1 ? "" : "s"} marked`}
+            href="/attendance"
+          />
+        ) : null}
         {can(session, "payments.view") ? (
           <StatCard
             icon={<WalletIcon className="size-4" />}
             label="Revenue (term)"
             value={formatMoney(revenueThisTerm)}
-            sub={unpaidCount > 0 ? `${formatNumber(unpaidCount)} unpaid invoices` : "No outstanding invoices"}
+            sub="Payments this term"
             href="/payments"
+          />
+        ) : null}
+        {can(session, "invoices.view") ? (
+          <StatCard
+            icon={<ReceiptIcon className="size-4" />}
+            label="Outstanding balance"
+            value={formatMoney(outstandingBalance)}
+            sub={unpaidCount > 0 ? `${formatNumber(unpaidCount)} unpaid / overdue` : "No outstanding invoices"}
+            href="/invoices?status=OVERDUE"
           />
         ) : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Revenue collections</CardTitle>
-            <CardDescription>Payments received this calendar year</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RevenueChart data={paymentChart} />
-          </CardContent>
-        </Card>
+        {can(session, "payments.view") ? (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Revenue collections</CardTitle>
+              <CardDescription>Payments received this calendar year</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RevenueChart data={paymentChart} />
+            </CardContent>
+          </Card>
+        ) : null}
 
-        <Card>
+        <Card className={can(session, "payments.view") ? undefined : "lg:col-span-2"}>
           <CardHeader>
             <CardTitle>Alerts</CardTitle>
             <CardDescription>Things that need attention</CardDescription>
@@ -200,7 +267,7 @@ export default async function DashboardPage() {
                 </div>
                 {recentResults.slice(0, 3).map((r) => (
                   <div key={r.id} className="flex items-center gap-3">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                       <AwardIcon className="size-4" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -211,7 +278,9 @@ export default async function DashboardPage() {
                         {r.examSubject.subject.name} · {r.exam.name}
                       </p>
                     </div>
-                    <span className="font-mono text-sm font-semibold">{r.grade ?? Number(r.percentage)}</span>
+                    <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-sm font-semibold tabular-nums text-primary">
+                      {r.grade ?? `${Number(r.percentage)}%`}
+                    </span>
                   </div>
                 ))}
               </>
@@ -229,18 +298,18 @@ export default async function DashboardPage() {
           <CardContent>
             <div className="space-y-3">
               {enrollmentByClass.map((c) => (
-                <div key={c.name}>
+                <Link key={c.id} href={`/classes/${c.id}`} className="group block">
                   <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium">{c.name}</span>
+                    <span className="font-medium transition-colors group-hover:text-primary">{c.name}</span>
                     <span className="text-muted-foreground">{formatNumber(c.students)}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-muted">
                     <div
-                      className="h-full rounded-full bg-primary"
+                      className="h-full rounded-full bg-primary transition-colors group-hover:bg-primary/80"
                       style={{ width: `${classes.length ? Math.round((c.students / Math.max(...enrollmentByClass.map((x) => x.students), 1)) * 100) : 0}%` }}
                     />
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </CardContent>
@@ -299,7 +368,7 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {isSchoolAdmin ? (
+      {isSchoolAdmin && can(session, "results.view") ? (
         <Card>
           <CardHeader className="border-b">
             <CardTitle>Recent activity</CardTitle>
@@ -343,22 +412,24 @@ function StatCard({
   href: string;
 }) {
   return (
-    <Card>
-      <CardContent className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-          <p className="mt-1 truncate text-xs text-muted-foreground">{sub}</p>
-        </div>
-        <Link
-          href={href}
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors hover:bg-primary/20"
-          aria-label={label}
-        >
-          {icon}
-        </Link>
-      </CardContent>
-    </Card>
+    <Link href={href} className="block">
+      <Card className="transition-colors hover:bg-muted/40 cursor-pointer">
+        <CardContent className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+            <p className="mt-1 truncate text-xs text-muted-foreground">{sub}</p>
+          </div>
+          <span
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            {icon}
+          </span>
+        </CardContent>
+        <ArrowRightIcon className="size-4 text-primary/60 mt-2 ml-2 transition-transform hover:translate-x-1" />
+      </Card>
+    </Link>
   );
 }
 

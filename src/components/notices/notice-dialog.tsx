@@ -11,15 +11,17 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect, TextAreaField } from "@/components/forms";
 import { NOTICE_AUDIENCES } from "@/lib/constants";
 import { todayISO } from "@/lib/format";
+import { toast } from "sonner";
 
 export function NoticeDialog({
   action,
   classes,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<unknown>;
   classes: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
@@ -37,10 +39,11 @@ export function NoticeDialog({
         <DialogHeader>
           <DialogTitle>New notice</DialogTitle>
         </DialogHeader>
-        <form
-          action={async (formData) => {
-            await action(formData);
+        <ActionForm
+          action={action}
+          onSuccess={() => {
             setOpen(false);
+            toast.success("Notice created");
           }}
           className="grid gap-4 sm:grid-cols-2"
         >
@@ -68,7 +71,7 @@ export function NoticeDialog({
           <div className="flex justify-end sm:col-span-2">
             <SubmitButton>Create notice</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </DialogContent>
     </Dialog>
   );

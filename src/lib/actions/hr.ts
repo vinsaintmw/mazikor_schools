@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { auditor } from "@/lib/audit";
 import { assertPermission, enumOf, getSchoolId, toDate, toFloat, toInt, toStr } from "@/lib/server-helpers";
 import { titleCase } from "@/lib/constants";
+import { error } from "@/lib/action-result";
 
 // ------------------------------------------------------------------
 // Employees
@@ -13,14 +14,20 @@ import { titleCase } from "@/lib/constants";
 
 export async function createEmployee(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "hr.manage");
   const schoolId = getSchoolId(session);
 
   const firstName = toStr(formData.get("firstName"));
   const lastName = toStr(formData.get("lastName"));
   const gender = toStr(formData.get("gender"));
-  if (!firstName || !lastName || !gender) throw new Error("Name and gender are required");
+  if (!firstName || !lastName || !gender) return error("Name and gender are required");
+
+  const departmentId = toStr(formData.get("departmentId")) || null;
+  if (departmentId) {
+    const department = await db.department.findFirst({ where: { id: departmentId, schoolId } });
+    if (!department) return error("Invalid department");
+  }
 
   const employee = await db.employee.create({
     data: {
@@ -31,7 +38,7 @@ export async function createEmployee(formData: FormData) {
       email: toStr(formData.get("email")) || null,
       phone: toStr(formData.get("phone")) || null,
       position: toStr(formData.get("position")) || null,
-      departmentId: toStr(formData.get("departmentId")) || null,
+      departmentId,
       salary: toFloat(formData.get("salary"), 0),
       joiningDate: toDate(toStr(formData.get("joiningDate"))),
       status: enumOf(toStr(formData.get("status")), ["ACTIVE", "ON_LEAVE", "RESIGNED", "TERMINATED"] as const, "ACTIVE"),
@@ -43,11 +50,11 @@ export async function createEmployee(formData: FormData) {
 
 export async function deleteEmployee(employeeId: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "hr.manage");
   const schoolId = getSchoolId(session);
   const existing = await db.employee.findFirst({ where: { id: employeeId, schoolId } });
-  if (!existing) throw new Error("Employee not found");
+  if (!existing) return error("Employee not found");
   await db.employee.delete({ where: { id: employeeId } });
   await auditor(session).log({ action: "DELETE", entity: "employee", entityId: employeeId });
   revalidatePath("/hr/employees");
@@ -59,7 +66,7 @@ export async function deleteEmployee(employeeId: string) {
 
 export async function createLeave(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "leave.manage");
   const schoolId = getSchoolId(session);
 
@@ -67,7 +74,11 @@ export async function createLeave(formData: FormData) {
   const type = toStr(formData.get("type"));
   const startDate = toDate(toStr(formData.get("startDate")));
   const endDate = toDate(toStr(formData.get("endDate")));
-  if (!employeeId || !type || !startDate || !endDate) throw new Error("All fields are required");
+  if (!employeeId || !type || !startDate || !endDate) return error("All fields are required");
+  if (endDate < startDate) return error("End date cannot be before the start date");
+
+  const employee = await db.employee.findFirst({ where: { id: employeeId, schoolId } });
+  if (!employee) return error("Employee not found");
 
   const days = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
 
@@ -88,11 +99,11 @@ export async function createLeave(formData: FormData) {
 
 export async function updateLeaveStatus(leaveId: string, status: "APPROVED" | "REJECTED") {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "leave.manage");
   const schoolId = getSchoolId(session);
   const existing = await db.leave.findFirst({ where: { id: leaveId, schoolId } });
-  if (!existing) throw new Error("Leave request not found");
+  if (!existing) return error("Leave request not found");
 
   await db.leave.update({
     where: { id: leaveId },
@@ -112,17 +123,17 @@ export async function updateLeaveStatus(leaveId: string, status: "APPROVED" | "R
 
 export async function createPayroll(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "payroll.manage");
   const schoolId = getSchoolId(session);
 
   const employeeId = toStr(formData.get("employeeId"));
   const periodStart = toDate(toStr(formData.get("periodStart")));
   const periodEnd = toDate(toStr(formData.get("periodEnd")));
-  if (!employeeId || !periodStart || !periodEnd) throw new Error("Employee and period are required");
+  if (!employeeId || !periodStart || !periodEnd) return error("Employee and period are required");
 
   const employee = await db.employee.findFirst({ where: { id: employeeId, schoolId } });
-  if (!employee) throw new Error("Employee not found");
+  if (!employee) return error("Employee not found");
 
   const basicSalary = toFloat(formData.get("basicSalary"), Number(employee.salary ?? 0));
   const allowances = { housing: toFloat(formData.get("housingAllowance"), 0), transport: toFloat(formData.get("transportAllowance"), 0) };
@@ -153,11 +164,11 @@ export async function createPayroll(formData: FormData) {
 
 export async function updatePayrollStatus(payrollId: string, status: "PAID" | "CANCELLED") {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "payroll.manage");
   const schoolId = getSchoolId(session);
   const existing = await db.payroll.findFirst({ where: { id: payrollId, schoolId } });
-  if (!existing) throw new Error("Payroll not found");
+  if (!existing) return error("Payroll not found");
 
   await db.payroll.update({
     where: { id: payrollId },

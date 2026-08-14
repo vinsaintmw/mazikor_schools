@@ -1,5 +1,7 @@
 import { createStaff, updateStaff } from "@/lib/actions/people";
+import { ActionForm } from "@/components/action-form";
 import { SubmitButton } from "@/components/submit-button";
+import { CancelButton } from "@/components/cancel-button";
 import { TextInput, NativeSelect, TextAreaField } from "@/components/forms";
 import { GENDERS, EMPLOYMENT_TYPES } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
@@ -27,10 +29,13 @@ export function StaffForm({
   staff?: StaffFormData | null;
   mode: "create" | "edit";
 }) {
-  const action = staff ? updateStaff.bind(null, staff.id) : createStaff;
+  const action = async (formData: FormData) => {
+    if (staff) await updateStaff(staff.id, formData);
+    else await createStaff(formData);
+  };
 
   return (
-    <form action={action} className="space-y-6">
+    <ActionForm action={action} className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <TextInput name="firstName" label="First name" required defaultValue={staff?.firstName} />
         <TextInput name="lastName" label="Last name" required defaultValue={staff?.lastName} />
@@ -63,8 +68,9 @@ export function StaffForm({
         <TextAreaField name="address" label="Address" defaultValue={staff?.address} rows={2} className="sm:col-span-2" />
       </div>
       <div className="flex justify-end gap-2">
+        <CancelButton href={staff ? `/staff/${staff.id}` : "/staff"} />
         <SubmitButton>{mode === "create" ? "Create staff" : "Save changes"}</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }

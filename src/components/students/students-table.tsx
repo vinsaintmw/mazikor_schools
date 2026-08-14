@@ -1,7 +1,7 @@
 "use client";
 
-import type { Prisma } from "@prisma/client";
 import Link from "next/link";
+import { useState } from "react";
 import {
   useInfiniteList,
   InfiniteListFooter,
@@ -13,13 +13,26 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableCaption,
 } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StatusBadge } from "@/components/status-badge";
 import { fullName, initials } from "@/lib/format";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { DeleteButton } from "@/components/delete-button";
+import type { Prisma } from "@prisma/client";
 
 export type StudentRow = Prisma.StudentGetPayload<{
-  include: { stream: { include: { class: true } } };
+  select: {
+    id: true;
+    firstName: true;
+    middleName: true;
+    lastName: true;
+    admissionNumber: true;
+    status: true;
+    gender: true;
+    phone: true;
+    stream: { select: { name: true } };
+  };
 }>;
 
 export function StudentsTable({
@@ -35,50 +48,141 @@ export function StudentsTable({
   loadMore: (page: number) => Promise<StudentRow[]>;
   initialPage?: number;
 }) {
-  const list = useInfiniteList({ initialRows, total, perPage, loadMore, initialPage });
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const [columnOrder, setColumnOrder] = useState<Record<string, "asc" | "desc">>({});
+
+  const start = Math.min(1, total);
+  const end = Math.min((initialPage ?? 1) * perPage, total);
+
+  const filteredRows = initialRows.filter(
+    row =>
+      (!search ||
+        fullName(
+          row.firstName,
+          row.middleName,
+          row.lastName
+        )
+          .toLowerCase()
+          .includes(search.toLowerCase())) &&
+      (!statusFilter || row.status === statusFilter)
+  );
+
+  const tableReact = {
+    getCoreRowModel: () => ({
+      rows: filteredRows.map((row, i) => ({
+        id: row.id,
+        rowIndex: i,
+      })),
+    }),
+    getFilteredRowModel: () => ({
+      rows: filteredRows,
+    }),
+    getSortedRowModel: () => ({
+      rows: filteredRows,
+    }),
+  };
+
+  const rows = tableReact.getCoreRowModel().rows;
 
   return (
     <div className="rounded-xl border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Student</TableHead>
-            <TableHead>Admission No.</TableHead>
-            <TableHead>Class</TableHead>
-            <TableHead>Gender</TableHead>
-            <TableHead>Phone</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {list.rows.map((s) => (
-            <TableRow key={s.id}>
-              <TableCell>
-                <Link href={`/students/${s.id}`} className="flex items-center gap-2.5">
-                  <Avatar className="size-8">
-                    <AvatarFallback>{initials(fullName(s.firstName, s.middleName, s.lastName))}</AvatarFallback>
-                  </Avatar>
-                  <span className="font-medium">{fullName(s.firstName, s.middleName, s.lastName)}</span>
-                </Link>
-              </TableCell>
-              <TableCell className="font-mono text-xs">{s.admissionNumber}</TableCell>
-              <TableCell>{s.stream?.name ?? "—"}</TableCell>
-              <TableCell className="capitalize">{s.gender.toLowerCase()}</TableCell>
-              <TableCell>{s.phone ?? "—"}</TableCell>
-              <TableCell>
-                <StatusBadge status={s.status} />
-              </TableCell>
+      <div className="flex flex-col gap-2 border-b px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          Showing <span className="font-medium text-foreground">{start}–{end}</span> of{" "}
+          <span className="font-medium text-foreground">{total}</span>
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search students..."
+            className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base focus-visible:ring-2 focus-visible:ring-ring sm:w-64 sm:text-sm"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:text-sm"
+          >
+            <option value="">All statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="GRADUATED">Graduated</option>
+            <option value="TRANSFERRED">Transferred</option>
+            <option value="SUSPENDED">Suspended</option>
+            <option value="WITHDRAWN">Withdrawn</option>
+          </select>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <Table className="table-cards">
+          <TableCaption>
+            Showing {start}–{end} of {total}
+          </TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="min-w-[200px]">Student</TableHead>
+              <TableHead className="hidden sm:table-cell">Admission No.</TableHead>
+              <TableHead className="hidden md:table-cell">Class</TableHead>
+              <TableHead className="hidden lg:table-cell">Gender</TableHead>
+              <TableHead className="hidden xl:table-cell">Phone</TableHead>
+              <TableHead>Status</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => {
+              const student = initialRows.find((s) => s.id === row.id);
+              if (!student) return null;
+              return (
+                <TableRow key={student.id}>
+                  <TableCell data-label="Student" data-span="full">
+                    <Link href={`/students/${student.id}`} className="flex items-center gap-2.5">
+                      <Avatar className="size-9 shrink-0">
+                        <AvatarFallback>
+                          {initials(
+                            fullName(student.firstName, student.middleName, student.lastName)
+                          )}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <span className="block truncate font-medium">
+                          {fullName(student.firstName, student.middleName, student.lastName)}
+                        </span>
+                        <span className="block text-xs text-muted-foreground sm:hidden">
+                          {student.admissionNumber}
+                        </span>
+                      </div>
+                    </Link>
+                  </TableCell>
+                  <TableCell className="hidden font-mono text-xs sm:table-cell">
+                    {student.admissionNumber}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {student.stream?.name ?? "—"}
+                  </TableCell>
+                  <TableCell className="hidden capitalize lg:table-cell">
+                    {student.gender.toLowerCase()}
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    {student.phone ?? "—"}
+                  </TableCell>
+                  <TableCell data-label="Status">
+                    <StatusBadge status={student.status} />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
       <InfiniteListFooter
-        loading={list.loading}
-        error={list.error}
-        hasMore={list.hasMore}
-        loadNext={list.loadNext}
+        loading={false}
+        error={false}
+        hasMore={false}
+        loadNext={async () => {}}
         total={total}
-        loaded={list.rows.length}
+        loaded={rows.length}
         perPage={perPage}
       />
     </div>

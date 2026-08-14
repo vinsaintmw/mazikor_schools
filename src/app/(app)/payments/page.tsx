@@ -41,7 +41,15 @@ export default async function PaymentsPage({
             }
           : {}),
       },
-      include: { student: true, invoice: { include: { items: true } } },
+      select: {
+        id: true,
+        receiptNumber: true,
+        amount: true,
+        method: true,
+        date: true,
+        student: { select: { firstName: true, lastName: true } },
+        invoice: { select: { number: true, status: true } },
+      },
       orderBy: { date: "desc" },
       skip: (nextPage - 1) * perPage,
       take: perPage,
@@ -64,17 +72,32 @@ export default async function PaymentsPage({
   const [payments, total, invoices] = await Promise.all([
     db.payment.findMany({
       where,
-      include: { student: true, invoice: { include: { items: true } } },
+      select: {
+        id: true,
+        receiptNumber: true,
+        amount: true,
+        method: true,
+        date: true,
+        student: { select: { firstName: true, lastName: true } },
+        invoice: { select: { number: true, status: true } },
+      },
       orderBy: { date: "desc" },
       skip,
       take: perPage,
     }),
     db.payment.count({ where }),
     db.invoice.findMany({
-      where: { schoolId },
-      include: { student: true, items: true, payments: true },
+      where: { schoolId, status: { in: ["UNPAID", "OVERDUE"] } },
+      select: {
+        id: true,
+        number: true,
+        discount: true,
+        student: { select: { firstName: true, lastName: true } },
+        items: { select: { amount: true } },
+        payments: { select: { amount: true } },
+      },
       orderBy: { createdAt: "desc" },
-      take: 500,
+      take: 200,
     }),
   ]);
 

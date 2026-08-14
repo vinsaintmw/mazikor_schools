@@ -84,24 +84,24 @@ export default async function ResultsPage({
           defaultValue={examId || null}
           options={exams.map((e) => ({ value: e.id, label: `${e.name} · ${formatDate(e.startDate)}` }))}
           placeholder="All examinations"
-          className="w-72"
+          className="w-full sm:w-72"
         />
         {examId ? (
           <Link
             href="/results"
-            className="inline-flex h-8 items-center rounded-lg border border-input bg-background px-2.5 text-sm font-medium transition-colors hover:bg-muted"
+            className="inline-flex h-11 items-center rounded-lg border border-input bg-background px-2.5 text-sm font-medium transition-colors hover:bg-muted sm:h-8"
           >
             Clear
           </Link>
         ) : null}
-        <div className="flex-1">
+        <div className="w-full sm:flex-1">
           <SearchInput placeholder="Search student…" />
         </div>
       </form>
 
       {results.length ? (
         <div className="rounded-xl border bg-card">
-          <Table>
+          <Table className="table-cards">
             <TableHeader>
               <TableRow>
                 <TableHead>Student</TableHead>
@@ -116,20 +116,20 @@ export default async function ResultsPage({
             <TableBody>
               {results.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell>
+                  <TableCell data-label="Student" data-span="full">
                     <Link href={`/students/${r.studentId}`} className="font-medium">
                       {fullName(r.student.firstName, r.student.middleName, r.student.lastName)}
                     </Link>
                     <span className="ml-2 font-mono text-xs text-muted-foreground">{r.student.admissionNumber}</span>
                   </TableCell>
-                  <TableCell>{r.examSubject.class?.name ?? "—"}</TableCell>
-                  <TableCell>{r.examSubject.subject.name}</TableCell>
-                  <TableCell className="font-mono">{Number(r.rawMark)}</TableCell>
-                  <TableCell className="font-mono">{Number(r.percentage)}%</TableCell>
-                  <TableCell>
+                  <TableCell data-label="Class">{r.examSubject.class?.name ?? "—"}</TableCell>
+                  <TableCell data-label="Subject">{r.examSubject.subject.name}</TableCell>
+                  <TableCell data-label="Mark" className="font-mono">{Number(r.rawMark)}</TableCell>
+                  <TableCell data-label="%" className="font-mono">{Number(r.percentage)}%</TableCell>
+                  <TableCell data-label="Grade">
                     <Badge variant={Number(r.percentage) >= 50 ? "default" : "destructive"}>{r.grade ?? "—"}</Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell data-label="Position" className="text-right">
                     {r.position ? (
                       <span className="inline-flex items-center gap-1 text-sm font-medium">
                         <AwardIcon className="size-3.5 text-muted-foreground" />

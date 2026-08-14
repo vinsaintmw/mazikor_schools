@@ -8,7 +8,10 @@ import { uid } from "@/lib/format";
 import { auditor } from "@/lib/audit";
 import { assertPermission, enumOf, getSchoolId, toBool, toDate, toFloat, toInt, toStr } from "@/lib/server-helpers";
 import { titleCase } from "@/lib/constants";
-import { endOfDay, startOfDay } from "@/lib/format";
+import { endOfDay, startOfDay, fullName } from "@/lib/format";
+import { error } from "@/lib/action-result";
+import { requireAnyPermission } from "@/lib/permissions";
+import { marksFieldErrors } from "@/lib/validation";
 
 // ------------------------------------------------------------------
 // Classes
@@ -16,15 +19,15 @@ import { endOfDay, startOfDay } from "@/lib/format";
 
 export async function createClass(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "classes.create");
   const schoolId = getSchoolId(session);
 
   const name = toStr(formData.get("name"));
-  if (!name) throw new Error("Class name is required");
+  if (!name) return error("Class name is required");
 
   const existing = await db.class.findFirst({ where: { schoolId, name } });
-  if (existing) throw new Error("A class with this name already exists");
+  if (existing) return error("A class with this name already exists");
 
   const cls = await db.class.create({
     data: {
@@ -42,12 +45,12 @@ export async function createClass(formData: FormData) {
 
 export async function updateClass(classId: string, formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "classes.edit");
   const schoolId = getSchoolId(session);
 
   const existing = await db.class.findFirst({ where: { id: classId, schoolId } });
-  if (!existing) throw new Error("Class not found");
+  if (!existing) return error("Class not found");
 
   await db.class.update({
     where: { id: classId },
@@ -66,11 +69,11 @@ export async function updateClass(classId: string, formData: FormData) {
 
 export async function deleteClass(classId: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "classes.delete");
   const schoolId = getSchoolId(session);
   const existing = await db.class.findFirst({ where: { id: classId, schoolId } });
-  if (!existing) throw new Error("Class not found");
+  if (!existing) return error("Class not found");
   await db.class.delete({ where: { id: classId } });
   await auditor(session).log({ action: "DELETE", entity: "class", entityId: classId });
   revalidatePath("/classes");
@@ -78,15 +81,15 @@ export async function deleteClass(classId: string) {
 
 export async function createStream(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "classes.edit");
   const schoolId = getSchoolId(session);
   const classId = toStr(formData.get("classId"));
   const name = toStr(formData.get("name"));
-  if (!classId || !name) throw new Error("Stream name and class are required");
+  if (!classId || !name) return error("Stream name and class are required");
 
   const cls = await db.class.findFirst({ where: { id: classId, schoolId } });
-  if (!cls) throw new Error("Class not found");
+  if (!cls) return error("Class not found");
 
   await db.stream.create({ data: { schoolId, classId, name } });
   revalidatePath(`/classes/${classId}`);
@@ -94,21 +97,27 @@ export async function createStream(formData: FormData) {
 
 export async function deleteStream(streamId: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
+  assertPermission(session, "classes.edit");
   const schoolId = getSchoolId(session);
   const stream = await db.stream.findFirst({ where: { id: streamId, schoolId } });
-  if (!stream) throw new Error("Stream not found");
+  if (!stream) return error("Stream not found");
   await db.stream.delete({ where: { id: streamId } });
   revalidatePath(`/classes/${stream.classId}`);
 }
 
 export async function toggleClassSubject(classId: string, formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "classes.edit");
   const schoolId = getSchoolId(session);
   const subjectId = toStr(formData.get("subjectId"));
-  if (!subjectId) throw new Error("Subject is required");
+  if (!subjectId) return error("Subject is required");
+
+  const cls = await db.class.findFirst({ where: { id: classId, schoolId } });
+  if (!cls) return error("Class not found");
+  const subject = await db.subject.findFirst({ where: { id: subjectId, schoolId } });
+  if (!subject) return error("Subject not found");
 
   const existing = await db.classSubject.findUnique({
     where: { classId_subjectId: { classId, subjectId } },
@@ -123,13 +132,20 @@ export async function toggleClassSubject(classId: string, formData: FormData) {
 
 export async function assignSubjectTeacher(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "classes.edit");
   const schoolId = getSchoolId(session);
   const teacherId = toStr(formData.get("teacherId"));
   const subjectId = toStr(formData.get("subjectId"));
   const classId = toStr(formData.get("classId"));
-  if (!teacherId || !subjectId || !classId) throw new Error("All fields are required");
+  if (!teacherId || !subjectId || !classId) return error("All fields are required");
+
+  const teacher = await db.teacher.findFirst({ where: { id: teacherId, schoolId } });
+  if (!teacher) return error("Teacher not found");
+  const subject = await db.subject.findFirst({ where: { id: subjectId, schoolId } });
+  if (!subject) return error("Subject not found");
+  const cls = await db.class.findFirst({ where: { id: classId, schoolId } });
+  if (!cls) return error("Class not found");
 
   await db.subjectTeacher.upsert({
     where: { teacherId_subjectId_classId: { teacherId, subjectId, classId } },
@@ -141,10 +157,11 @@ export async function assignSubjectTeacher(formData: FormData) {
 
 export async function unassignSubjectTeacher(assignmentId: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
+  assertPermission(session, "classes.edit");
   const schoolId = getSchoolId(session);
   const link = await db.subjectTeacher.findFirst({ where: { id: assignmentId, schoolId } });
-  if (!link) throw new Error("Assignment not found");
+  if (!link) return error("Assignment not found");
   await db.subjectTeacher.delete({ where: { id: assignmentId } });
   revalidatePath(`/classes/${link.classId}`);
 }
@@ -155,16 +172,22 @@ export async function unassignSubjectTeacher(assignmentId: string) {
 
 export async function createSubject(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "subjects.create");
   const schoolId = getSchoolId(session);
 
   const code = toStr(formData.get("code")).toUpperCase();
   const name = titleCase(toStr(formData.get("name")));
-  if (!code || !name) throw new Error("Subject code and name are required");
+  if (!code || !name) return error("Subject code and name are required");
 
   const existing = await db.subject.findFirst({ where: { schoolId, code } });
-  if (existing) throw new Error("A subject with this code already exists");
+  if (existing) return error("A subject with this code already exists");
+
+  const departmentId = toStr(formData.get("departmentId")) || null;
+  if (departmentId) {
+    const department = await db.department.findFirst({ where: { id: departmentId, schoolId } });
+    if (!department) return error("Invalid department");
+  }
 
   const subject = await db.subject.create({
     data: {
@@ -172,7 +195,7 @@ export async function createSubject(formData: FormData) {
       code,
       name,
       description: toStr(formData.get("description")) || null,
-      departmentId: toStr(formData.get("departmentId")) || null,
+      departmentId,
       passMark: toFloat(formData.get("passMark"), 40),
       maxMark: toFloat(formData.get("maxMark"), 100),
     },
@@ -183,11 +206,17 @@ export async function createSubject(formData: FormData) {
 
 export async function updateSubject(subjectId: string, formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "subjects.edit");
   const schoolId = getSchoolId(session);
   const existing = await db.subject.findFirst({ where: { id: subjectId, schoolId } });
-  if (!existing) throw new Error("Subject not found");
+  if (!existing) return error("Subject not found");
+
+  const departmentId = toStr(formData.get("departmentId")) || null;
+  if (departmentId) {
+    const department = await db.department.findFirst({ where: { id: departmentId, schoolId } });
+    if (!department) return error("Invalid department");
+  }
 
   await db.subject.update({
     where: { id: subjectId },
@@ -195,7 +224,7 @@ export async function updateSubject(subjectId: string, formData: FormData) {
       code: toStr(formData.get("code")).toUpperCase() || existing.code,
       name: titleCase(toStr(formData.get("name"))) || existing.name,
       description: toStr(formData.get("description")) || null,
-      departmentId: toStr(formData.get("departmentId")) || null,
+      departmentId,
       passMark: toFloat(formData.get("passMark"), Number(existing.passMark)),
       maxMark: toFloat(formData.get("maxMark"), Number(existing.maxMark)),
     },
@@ -206,11 +235,11 @@ export async function updateSubject(subjectId: string, formData: FormData) {
 
 export async function deleteSubject(subjectId: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "subjects.delete");
   const schoolId = getSchoolId(session);
   const existing = await db.subject.findFirst({ where: { id: subjectId, schoolId } });
-  if (!existing) throw new Error("Subject not found");
+  if (!existing) return error("Subject not found");
   await db.subject.delete({ where: { id: subjectId } });
   await auditor(session).log({ action: "DELETE", entity: "subject", entityId: subjectId });
   revalidatePath("/subjects");
@@ -222,17 +251,17 @@ export async function deleteSubject(subjectId: string) {
 
 export async function saveAttendance(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "attendance.manage");
   const schoolId = getSchoolId(session);
 
   const dateStr = toStr(formData.get("date"));
   const streamId = toStr(formData.get("streamId"));
   const subjectId = toStr(formData.get("subjectId")) || null;
-  if (!dateStr || !streamId) throw new Error("Date and class stream are required");
+  if (!dateStr || !streamId) return error("Date and class stream are required");
 
   const stream = await db.stream.findFirst({ where: { id: streamId, schoolId } });
-  if (!stream) throw new Error("Stream not found");
+  if (!stream) return error("Stream not found");
   const day = new Date(`${dateStr}T00:00:00`);
 
   const entries = await db.attendance.findMany({
@@ -289,16 +318,16 @@ export async function saveAttendance(formData: FormData) {
 
 export async function createExam(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "exams.create");
   const schoolId = getSchoolId(session);
 
   const name = toStr(formData.get("name"));
   const termId = toStr(formData.get("termId"));
-  if (!name || !termId) throw new Error("Exam name and term are required");
+  if (!name || !termId) return error("Exam name and term are required");
 
   const term = await db.term.findFirst({ where: { id: termId, schoolId } });
-  if (!term) throw new Error("Term not found");
+  if (!term) return error("Term not found");
 
   const exam = await db.exam.create({
     data: {
@@ -319,14 +348,20 @@ export async function createExam(formData: FormData) {
 
 export async function updateExam(examId: string, formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "exams.edit");
   const schoolId = getSchoolId(session);
   const existing = await db.exam.findFirst({ where: { id: examId, schoolId } });
-  if (!existing) throw new Error("Exam not found");
+  if (!existing) return error("Exam not found");
 
   const termId = toStr(formData.get("termId"));
   const term = termId ? await db.term.findFirst({ where: { id: termId, schoolId } }) : null;
+
+  const gradeScaleId = toStr(formData.get("gradeScaleId")) || null;
+  if (gradeScaleId) {
+    const gradeScale = await db.gradeScale.findFirst({ where: { id: gradeScaleId, schoolId } });
+    if (!gradeScale) return error("Invalid grade scale");
+  }
 
   await db.exam.update({
     where: { id: examId },
@@ -336,7 +371,7 @@ export async function updateExam(examId: string, formData: FormData) {
       ...(term
         ? { termId: term.id, academicYearId: term.academicYearId }
         : {}),
-      gradeScaleId: toStr(formData.get("gradeScaleId")) || null,
+      gradeScaleId,
       startDate: toDate(toStr(formData.get("startDate"))) ?? existing.startDate,
       endDate: toDate(toStr(formData.get("endDate"))) ?? existing.endDate,
       description: toStr(formData.get("description")) || null,
@@ -349,11 +384,11 @@ export async function updateExam(examId: string, formData: FormData) {
 
 export async function deleteExam(examId: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "exams.delete");
   const schoolId = getSchoolId(session);
   const existing = await db.exam.findFirst({ where: { id: examId, schoolId } });
-  if (!existing) throw new Error("Exam not found");
+  if (!existing) return error("Exam not found");
   await db.exam.delete({ where: { id: examId } });
   await auditor(session).log({ action: "DELETE", entity: "exam", entityId: examId });
   revalidatePath("/exams");
@@ -361,14 +396,14 @@ export async function deleteExam(examId: string) {
 
 export async function publishExam(examId: string, published: boolean) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "exams.publish");
   const schoolId = getSchoolId(session);
   const existing = await db.exam.findFirst({ where: { id: examId, schoolId } });
-  if (!existing) throw new Error("Exam not found");
+  if (!existing) return error("Exam not found");
 
   if (published) {
-    await computePositions(examId);
+    await computePositions(examId, schoolId);
   }
 
   await db.exam.update({ where: { id: examId }, data: { isPublished: published } });
@@ -378,15 +413,15 @@ export async function publishExam(examId: string, published: boolean) {
   revalidatePath("/results");
 }
 
-export async function computePositions(examId: string) {
-  const exam = await db.exam.findUnique({
-    where: { id: examId },
+async function computePositions(examId: string, schoolId: string) {
+  const exam = await db.exam.findFirst({
+    where: { id: examId, schoolId },
     include: { subjects: { select: { id: true } } },
   });
   if (!exam) return;
 
   const results = await db.result.findMany({
-    where: { examId },
+    where: { examId, schoolId },
     select: { studentId: true, percentage: true },
   });
 
@@ -405,7 +440,7 @@ export async function computePositions(examId: string) {
   await db.$transaction(
     [...positions.entries()].map(([studentId, position]) =>
       db.result.updateMany({
-        where: { examId, studentId },
+        where: { examId, studentId, schoolId },
         data: { position },
       })
     )
@@ -414,26 +449,38 @@ export async function computePositions(examId: string) {
 
 export async function saveMarks(examSubjectId: string, formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "results.enter");
   const schoolId = getSchoolId(session);
 
   const examSubject = await db.examSubject.findFirst({ where: { id: examSubjectId, schoolId } });
-  if (!examSubject) throw new Error("Exam subject not found");
+  if (!examSubject) return error("Exam subject not found");
 
   const maxMark = Number(examSubject.maxMark) || 100;
   const passMark = Number(examSubject.passMark) || 40;
   const gradeScale = examSubject.examId
-    ? await db.exam.findUnique({ where: { id: examSubject.examId }, select: { gradeScale: { include: { bands: true } } } })
+    ? await db.exam.findFirst({ where: { id: examSubject.examId, schoolId }, select: { gradeScale: { include: { bands: true } } } })
     : null;
 
   const students = await db.enrollment.findMany({
-    where: { classId: examSubject.classId },
-    select: { studentId: true },
+    where: { classId: examSubject.classId, schoolId },
+    include: { student: { select: { firstName: true, middleName: true, lastName: true } } },
   });
 
+  const marksErrors = marksFieldErrors(
+    students.map(({ studentId, student }) => ({
+      inputName: `mark_${studentId}`,
+      studentName: fullName(student.firstName, student.middleName, student.lastName),
+      raw: toStr(formData.get(`mark_${studentId}`)),
+      maxMark,
+    }))
+  );
+  if (Object.keys(marksErrors).length) {
+    return error("Please fix the highlighted marks.", marksErrors);
+  }
+
   const existing = await db.result.findMany({
-    where: { examSubjectId },
+    where: { examSubjectId, schoolId },
     select: { studentId: true, id: true },
   });
   const existingByStudent = new Map(existing.map((e) => [e.studentId, e.id]));
@@ -444,7 +491,7 @@ export async function saveMarks(examSubjectId: string, formData: FormData) {
   const ops = students.map(({ studentId }) => {
     const raw = toStr(formData.get(`mark_${studentId}`));
     if (!raw) return null;
-    const mark = Math.max(0, Math.min(maxMark, toFloat(raw)));
+    const mark = toFloat(raw);
     const percentage = maxMark > 0 ? (mark / maxMark) * 100 : 0;
     let grade: string | null = null;
     let points = 0;
@@ -495,16 +542,21 @@ export async function saveMarks(examSubjectId: string, formData: FormData) {
 
 export async function addExamSubject(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "exams.edit");
   const schoolId = getSchoolId(session);
   const examId = toStr(formData.get("examId"));
   const subjectId = toStr(formData.get("subjectId"));
   const classId = toStr(formData.get("classId"));
-  if (!examId || !subjectId || !classId) throw new Error("All fields are required");
+  if (!examId || !subjectId || !classId) return error("All fields are required");
 
   const exam = await db.exam.findFirst({ where: { id: examId, schoolId } });
-  if (!exam) throw new Error("Exam not found");
+  if (!exam) return error("Exam not found");
+
+  const subject = await db.subject.findFirst({ where: { id: subjectId, schoolId } });
+  if (!subject) return error("Subject not found");
+  const cls = await db.class.findFirst({ where: { id: classId, schoolId } });
+  if (!cls) return error("Class not found");
 
   await db.examSubject.upsert({
     where: { examId_subjectId_classId: { examId, subjectId, classId } },
@@ -530,10 +582,11 @@ export async function addExamSubject(formData: FormData) {
 
 export async function removeExamSubject(examSubjectId: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
+  assertPermission(session, "exams.edit");
   const schoolId = getSchoolId(session);
   const es = await db.examSubject.findFirst({ where: { id: examSubjectId, schoolId } });
-  if (!es) throw new Error("Not found");
+  if (!es) return error("Not found");
   await db.examSubject.delete({ where: { id: examSubjectId } });
   revalidatePath(`/exams/${es.examId}`);
 }
@@ -544,7 +597,7 @@ export async function removeExamSubject(examSubjectId: string) {
 
 export async function addTimetableEntry(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "timetable.manage");
   const schoolId = getSchoolId(session);
 
@@ -558,8 +611,17 @@ export async function addTimetableEntry(formData: FormData) {
   const endTime = toStr(formData.get("endTime"));
 
   if (!classId || !teacherId || !subjectId || !startTime || !endTime) {
-    throw new Error("All fields are required");
+    return error("All fields are required");
   }
+
+  const [cls, stream, teacher, subject] = await Promise.all([
+    db.class.findFirst({ where: { id: classId, schoolId } }),
+    streamId ? db.stream.findFirst({ where: { id: streamId, schoolId } }) : Promise.resolve(null),
+    db.teacher.findFirst({ where: { id: teacherId, schoolId } }),
+    db.subject.findFirst({ where: { id: subjectId, schoolId } }),
+  ]);
+  if (!cls || !teacher || !subject || (streamId && !stream)) return error("Invalid class, stream, teacher or subject");
+  if (stream && stream.classId !== classId) return error("Stream does not belong to the selected class");
 
   await db.timetableEntry.create({
     data: {
@@ -580,10 +642,11 @@ export async function addTimetableEntry(formData: FormData) {
 
 export async function deleteTimetableEntry(entryId: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
+  assertPermission(session, "timetable.manage");
   const schoolId = getSchoolId(session);
   const entry = await db.timetableEntry.findFirst({ where: { id: entryId, schoolId } });
-  if (!entry) throw new Error("Not found");
+  if (!entry) return error("Not found");
   await db.timetableEntry.delete({ where: { id: entryId } });
   revalidatePath("/timetable");
 }
@@ -594,7 +657,7 @@ export async function deleteTimetableEntry(entryId: string) {
 
 export async function createAssignment(formData: FormData) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "assignments.create");
   const schoolId = getSchoolId(session);
 
@@ -602,13 +665,19 @@ export async function createAssignment(formData: FormData) {
   const classId = toStr(formData.get("classId"));
   const subjectId = toStr(formData.get("subjectId"));
   const dueDate = toDate(toStr(formData.get("dueDate")));
-  if (!title || !classId || !subjectId || !dueDate) throw new Error("All fields are required");
+  if (!title || !classId || !subjectId || !dueDate) return error("All fields are required");
 
   const teacher = await db.teacher.findFirst({
     where: { OR: [{ userId: session.user.id }, { schoolId }] },
     orderBy: { joiningDate: "asc" },
   });
-  if (!teacher) throw new Error("No teacher record linked to your account");
+  if (!teacher) return error("No teacher record linked to your account");
+
+  const [cls, subject] = await Promise.all([
+    db.class.findFirst({ where: { id: classId, schoolId } }),
+    db.subject.findFirst({ where: { id: subjectId, schoolId } }),
+  ]);
+  if (!cls || !subject) return error("Invalid class or subject");
 
   const assignment = await db.assignment.create({
     data: {
@@ -629,24 +698,25 @@ export async function createAssignment(formData: FormData) {
 
 export async function deleteAssignment(assignmentId: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
+  requireAnyPermission(session, ["assignments.create", "assignments.grade"]);
   const schoolId = getSchoolId(session);
   const existing = await db.assignment.findFirst({ where: { id: assignmentId, schoolId } });
-  if (!existing) throw new Error("Not found");
+  if (!existing) return error("Not found");
   await db.assignment.delete({ where: { id: assignmentId } });
   revalidatePath("/assignments");
 }
 
 export async function gradeSubmission(submissionId: string, grade: number, feedback: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return error("Unauthorized");
   assertPermission(session, "assignments.grade");
   const schoolId = getSchoolId(session);
   const sub = await db.assignmentSubmission.findFirst({
     where: { id: submissionId, schoolId },
     include: { assignment: true },
   });
-  if (!sub) throw new Error("Submission not found");
+  if (!sub) return error("Submission not found");
   await db.assignmentSubmission.update({
     where: { id: submissionId },
     data: { grade, feedback: feedback || null },

@@ -5,11 +5,11 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getSchoolId } from "@/lib/server-helpers";
-import { fullName, formatNumber } from "@/lib/format";
-import { PageHeader } from "@/components/page-header";
+import { fullName, formatNumber } from "@/lib/format";import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect } from "@/components/forms";
 import { DeleteButton } from "@/components/delete-button";
 import {
@@ -20,8 +20,13 @@ import {
   assignSubjectTeacher,
   unassignSubjectTeacher,
 } from "@/lib/actions/academics";
+import { SetBreadcrumbLabel } from "@/components/layout/set-breadcrumb-label";
 
-export const metadata = { title: "Class details" };
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Class details",
+};
 
 export default async function ClassDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -63,6 +68,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-6">
+      <SetBreadcrumbLabel path={`/classes/${cls.id}`} label={cls.name} />
       <PageHeader title={`${cls.name}`} description={`Level ${cls.level} · Room ${cls.room ?? "—"}`}>
         {canEdit ? (
           <Button asChild variant="outline">
@@ -90,6 +96,13 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
         </p>
       ) : null}
 
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MiniStat label="Active students" value={formatNumber(cls.enrollments.length)} />
+        <MiniStat label="Streams" value={formatNumber(cls.streams.length)} />
+        <MiniStat label="Subjects offered" value={formatNumber(cls.subjects.length)} />
+        <MiniStat label="Subject teachers" value={formatNumber(cls.subjectTeachers.length)} />
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4">
           <Card>
@@ -108,7 +121,11 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
                       <p className="text-xs text-muted-foreground">{formatNumber(s.students.length)} active students</p>
                     </div>
                     {canEdit ? (
-                      <form action={deleteStream.bind(null, s.id)}>
+                      <form
+                        action={async () => {
+                          await deleteStream(s.id);
+                        }}
+                      >
                         <Button type="submit" variant="ghost" size="icon-sm" aria-label={`Delete stream ${s.name}`}>
                           <XIcon />
                         </Button>
@@ -122,7 +139,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
               </div>
 
               {canEdit ? (
-                <form action={createStream} className="mt-4 space-y-2">
+                <ActionForm action={createStream} className="mt-4 space-y-2" successLabel="Stream added">
                   <input type="hidden" name="classId" value={cls.id} />
                   <TextInput name="name" label="Add stream" placeholder="e.g. Form 1C" required />
                   <div className="flex justify-end">
@@ -131,7 +148,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
                       Add stream
                     </SubmitButton>
                   </div>
-                </form>
+                </ActionForm>
               ) : null}
             </CardContent>
           </Card>
@@ -168,15 +185,18 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
               <CardDescription>
                 {formatNumber(cls.subjects.length)} subjects offered
               </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4">
+            </CardHeader>            <CardContent className="pt-4">
               <div className="flex flex-wrap gap-2">
                 {cls.subjects.map((cs) => (
                   <span key={cs.id} className="flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-sm font-medium">
                     <CheckIcon className="size-3.5 text-emerald-600" />
                     {cs.subject.name}
                     {canEdit ? (
-                      <form action={toggleClassSubject.bind(null, cls.id)}>
+                      <form
+                        action={async (formData: FormData) => {
+                          await toggleClassSubject(cls.id, formData);
+                        }}
+                      >
                         <input type="hidden" name="subjectId" value={cs.subjectId} />
                         <Button
                           type="submit"
@@ -194,7 +214,12 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
               </div>
 
               {canEdit ? (
-                <form action={toggleClassSubject.bind(null, cls.id)} className="mt-4 flex gap-2">
+                <form
+                  action={async (formData: FormData) => {
+                    await toggleClassSubject(cls.id, formData);
+                  }}
+                  className="mt-4 flex gap-2"
+                >
                   <NativeSelect
                     name="subjectId"
                     options={allSubjects.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` }))}
@@ -226,7 +251,11 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
                         </p>
                       </div>
                       {canEdit ? (
-                        <form action={unassignSubjectTeacher.bind(null, st.id)}>
+                        <form
+                          action={async () => {
+                            await unassignSubjectTeacher(st.id);
+                          }}
+                        >
                           <Button type="submit" variant="ghost" size="icon-sm" aria-label="Unassign teacher">
                             <XIcon />
                           </Button>
@@ -240,7 +269,7 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
               )}
 
               {canEdit ? (
-                <form action={assignSubjectTeacher} className="mt-4 grid gap-2 sm:grid-cols-3">
+                <ActionForm action={assignSubjectTeacher} className="mt-4 grid gap-2 sm:grid-cols-3" successLabel="Teacher assigned">
                   <input type="hidden" name="classId" value={cls.id} />
                   <NativeSelect
                     name="teacherId"
@@ -258,12 +287,23 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
                     <PlusIcon />
                     Assign
                   </SubmitButton>
-                </form>
+                </ActionForm>
               ) : null}
             </CardContent>
           </Card>
         </div>
       </div>
     </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <Card>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+      </CardContent>
+    </Card>
   );
 }

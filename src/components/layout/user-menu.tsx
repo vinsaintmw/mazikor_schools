@@ -25,11 +25,16 @@ export function UserMenu({ session }: { session: Session }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 gap-2 px-2">
-          <Avatar className="size-6">
+        <Button variant="ghost" className="h-9 gap-2 px-2">
+          <Avatar className="size-7">
             <AvatarFallback className="text-[10px]">{initials(name)}</AvatarFallback>
           </Avatar>
-          <span className="hidden max-w-40 truncate text-sm font-medium sm:inline">{name}</span>
+          <span className="hidden text-left lg:block">
+            <span className="block max-w-32 truncate text-sm leading-tight font-medium">{name}</span>
+            <span className="block max-w-32 truncate text-xs leading-tight text-muted-foreground">
+              {roleName || schoolName}
+            </span>
+          </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">

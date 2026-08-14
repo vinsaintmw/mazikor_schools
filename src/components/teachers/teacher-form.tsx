@@ -1,5 +1,7 @@
 import { createTeacher, updateTeacher } from "@/lib/actions/people";
+import { ActionForm } from "@/components/action-form";
 import { SubmitButton } from "@/components/submit-button";
+import { CancelButton } from "@/components/cancel-button";
 import { TextInput, NativeSelect, TextAreaField } from "@/components/forms";
 import { GENDERS, EMPLOYMENT_TYPES } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
@@ -28,10 +30,13 @@ export function TeacherForm({
   teacher?: TeacherFormData | null;
   mode: "create" | "edit";
 }) {
-  const action = teacher ? updateTeacher.bind(null, teacher.id) : createTeacher;
+  const action = async (formData: FormData) => {
+    if (teacher) await updateTeacher(teacher.id, formData);
+    else await createTeacher(formData);
+  };
 
   return (
-    <form action={action} className="space-y-6">
+    <ActionForm action={action} className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <TextInput name="firstName" label="First name" required defaultValue={teacher?.firstName} />
         <TextInput name="lastName" label="Last name" required defaultValue={teacher?.lastName} />
@@ -65,8 +70,9 @@ export function TeacherForm({
         <TextAreaField name="address" label="Address" defaultValue={teacher?.address} rows={2} className="sm:col-span-2" />
       </div>
       <div className="flex justify-end gap-2">
+        <CancelButton href={teacher ? `/teachers/${teacher.id}` : "/teachers"} />
         <SubmitButton>{mode === "create" ? "Create teacher" : "Save changes"}</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }

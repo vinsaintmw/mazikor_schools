@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect } from "@/components/forms";
+import { toast } from "sonner";
 
 export interface FeeStructureValues {
   id: string;
@@ -31,7 +33,7 @@ export function FeeStructureDialog({
   terms,
   mode,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<unknown>;
   fee?: FeeStructureValues | null;
   classes: { id: string; name: string }[];
   terms: { id: string; name: string }[];
@@ -57,10 +59,11 @@ export function FeeStructureDialog({
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "New fee structure" : "Edit fee structure"}</DialogTitle>
         </DialogHeader>
-        <form
-          action={async (formData) => {
-            await action(formData);
+        <ActionForm
+          action={action}
+          onSuccess={() => {
             setOpen(false);
+            toast.success(mode === "create" ? "Fee structure created" : "Fee structure updated");
           }}
           className="grid gap-4 sm:grid-cols-2"
         >
@@ -94,7 +97,7 @@ export function FeeStructureDialog({
           <div className="flex justify-end gap-2 sm:col-span-2">
             <SubmitButton>{mode === "create" ? "Create fee structure" : "Save changes"}</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </DialogContent>
     </Dialog>
   );

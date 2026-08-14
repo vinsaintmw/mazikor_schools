@@ -1,5 +1,7 @@
 import { createClass, updateClass } from "@/lib/actions/academics";
+import { ActionForm } from "@/components/action-form";
 import { SubmitButton } from "@/components/submit-button";
+import { CancelButton } from "@/components/cancel-button";
 import { TextInput } from "@/components/forms";
 import { NativeSelect } from "@/components/forms";
 
@@ -24,7 +26,7 @@ export function ClassForm({
   const action = classData ? updateClass.bind(null, classData.id) : createClass;
 
   return (
-    <form action={action} className="space-y-6">
+    <ActionForm action={action} className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <TextInput name="name" label="Class name" required defaultValue={classData?.name} placeholder="e.g. Form 1" />
         <TextInput name="level" label="Level" type="number" min={1} max={12} defaultValue={classData?.level ?? 1} />
@@ -40,8 +42,9 @@ export function ClassForm({
         />
       </div>
       <div className="flex justify-end gap-2">
+        <CancelButton href={classData ? `/classes/${classData.id}` : "/classes"} />
         <SubmitButton>{mode === "create" ? "Create class" : "Save changes"}</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }

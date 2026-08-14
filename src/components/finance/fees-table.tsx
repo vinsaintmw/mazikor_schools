@@ -46,7 +46,7 @@ export function FeesTable({
 
   return (
     <div className="rounded-xl border bg-card">
-      <Table>
+      <Table className="table-cards">
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
@@ -61,15 +61,19 @@ export function FeesTable({
         <TableBody>
           {list.rows.map((f) => (
             <TableRow key={f.id}>
-              <TableCell className="font-medium">{f.name}</TableCell>
-              <TableCell>{f.category}</TableCell>
-              <TableCell className="font-mono">{formatMoney(f.amount)}</TableCell>
-              <TableCell>{f.class?.name ?? "All classes"}</TableCell>
-              <TableCell>{f.term?.name ?? "All terms"}</TableCell>
-              <TableCell>
+              <TableCell data-label="Name" data-span="full" className="font-medium">
+                {f.name}
+              </TableCell>
+              <TableCell data-label="Category">{f.category}</TableCell>
+              <TableCell data-label="Amount" className="font-mono">
+                {formatMoney(f.amount)}
+              </TableCell>
+              <TableCell data-label="Class">{f.class?.name ?? "All classes"}</TableCell>
+              <TableCell data-label="Term">{f.term?.name ?? "All terms"}</TableCell>
+              <TableCell data-label="Status">
                 <StatusBadge status={f.isActive ? "ACTIVE" : "WITHDRAWN"} />
               </TableCell>
-              <TableCell>
+              <TableCell data-label="Actions" data-span="full">
                 <div className="flex justify-end gap-1">
                   {canManage ? (
                     <FeeStructureDialog

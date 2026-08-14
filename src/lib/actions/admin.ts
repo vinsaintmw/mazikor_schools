@@ -7,6 +7,7 @@ import { auditor } from "@/lib/audit";
 import { enumOf, isSuperAdminSession, toBool, toFloat, toInt, toStr } from "@/lib/server-helpers";
 import { slugify } from "@/lib/slug";
 import bcrypt from "bcryptjs";
+import { error } from "@/lib/action-result";
 
 async function getSession() {
   const session = await auth();
@@ -23,7 +24,7 @@ export async function createSchool(formData: FormData) {
   const session = await getSession();
   const name = toStr(formData.get("name"));
   const code = toStr(formData.get("code"));
-  if (!name || !code) throw new Error("School name and code are required");
+  if (!name || !code) return error("School name and code are required");
 
   const baseSlug = slugify(name) || slugify(code);
   let slug = baseSlug;
@@ -66,7 +67,7 @@ export async function createSchool(formData: FormData) {
 export async function updateSchool(schoolId: string, formData: FormData) {
   const session = await getSession();
   const existing = await db.school.findUnique({ where: { id: schoolId } });
-  if (!existing) throw new Error("School not found");
+  if (!existing) return error("School not found");
 
   await db.school.update({
     where: { id: schoolId },
@@ -89,7 +90,7 @@ export async function updateSchool(schoolId: string, formData: FormData) {
 export async function toggleSchoolActive(schoolId: string) {
   const session = await getSession();
   const existing = await db.school.findUnique({ where: { id: schoolId } });
-  if (!existing) throw new Error("School not found");
+  if (!existing) return error("School not found");
   await db.school.update({ where: { id: schoolId }, data: { isActive: !existing.isActive } });
   await auditor(session).log({ action: "TOGGLE", entity: "school", entityId: schoolId });
   revalidatePath("/admin/schools");
@@ -102,7 +103,7 @@ export async function toggleSchoolActive(schoolId: string) {
 export async function createPlan(formData: FormData) {
   const session = await getSession();
   const name = toStr(formData.get("name"));
-  if (!name) throw new Error("Plan name is required");
+  if (!name) return error("Plan name is required");
 
   const plan = await db.plan.create({
     data: {
@@ -126,7 +127,7 @@ export async function createPlan(formData: FormData) {
 export async function togglePlanActive(planId: string) {
   const session = await getSession();
   const existing = await db.plan.findUnique({ where: { id: planId } });
-  if (!existing) throw new Error("Plan not found");
+  if (!existing) return error("Plan not found");
   await db.plan.update({ where: { id: planId }, data: { isActive: !existing.isActive } });
   await auditor(session).log({ action: "TOGGLE", entity: "plan", entityId: planId });
   revalidatePath("/admin/plans");
@@ -141,7 +142,7 @@ export async function upsertSubscription(formData: FormData) {
   const schoolId = toStr(formData.get("schoolId"));
   const planId = toStr(formData.get("planId"));
   const status = toStr(formData.get("status"));
-  if (!schoolId || !planId || !status) throw new Error("School, plan and status are required");
+  if (!schoolId || !planId || !status) return error("School, plan and status are required");
 
   const existing = await db.subscription.findUnique({ where: { schoolId } });
   if (existing) {
@@ -179,13 +180,13 @@ export async function createAdminUser(formData: FormData) {
   const roleKey = toStr(formData.get("roleKey"));
   const schoolId = toStr(formData.get("schoolId")) || null;
 
-  if (!name || !email || !password || !roleKey) throw new Error("All fields are required");
+  if (!name || !email || !password || !roleKey) return error("All fields are required");
 
   const existing = await db.user.findUnique({ where: { email } });
-  if (existing) throw new Error("A user with this email already exists");
+  if (existing) return error("A user with this email already exists");
 
   const role = await db.role.findFirst({ where: { key: roleKey, ...(schoolId ? { OR: [{ schoolId }, { schoolId: null }] } : { schoolId: null }) } });
-  if (!role) throw new Error("Role not found");
+  if (!role) return error("Role not found");
 
   const user = await db.user.create({
     data: {

@@ -11,15 +11,19 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect, TextAreaField } from "@/components/forms";
+import { toast } from "sonner";
 
 const TYPES = ["SPORT", "ACADEMIC", "MEETING", "HOLIDAY", "EXCURSION", "OTHER"];
-const COLORS = ["#1d4ed8", "#059669", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
+import { BRAND_COLORS } from "@/lib/constants";
+
+const COLORS = Object.values(BRAND_COLORS);
 
 export function EventDialog({
   action,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<unknown>;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -35,10 +39,11 @@ export function EventDialog({
         <DialogHeader>
           <DialogTitle>New event</DialogTitle>
         </DialogHeader>
-        <form
-          action={async (formData) => {
-            await action(formData);
+        <ActionForm
+          action={action}
+          onSuccess={() => {
             setOpen(false);
+            toast.success("Event created");
           }}
           className="grid gap-4 sm:grid-cols-2"
         >
@@ -63,7 +68,7 @@ export function EventDialog({
           <div className="flex justify-end sm:col-span-2">
             <SubmitButton>Create event</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </DialogContent>
     </Dialog>
   );

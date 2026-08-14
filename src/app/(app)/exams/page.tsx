@@ -141,7 +141,11 @@ export default async function ExamsPage({
                         </Link>
                       </Button>
                       {canPublish ? (
-                        <form action={publishExam.bind(null, e.id, !e.isPublished)}>
+                        <form
+                          action={async () => {
+                            await publishExam(e.id, !e.isPublished);
+                          }}
+                        >
                           <Button
                             type="submit"
                             variant="ghost"

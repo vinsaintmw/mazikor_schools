@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { LoginForm } from "@/components/auth/login-form";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 
-export const metadata = { title: "Sign in" };
+export const metadata: Metadata = {
+  title: "Sign in",
+  robots: { index: false, follow: false },
+};
 
 export default async function LoginPage() {
   const session = await auth();

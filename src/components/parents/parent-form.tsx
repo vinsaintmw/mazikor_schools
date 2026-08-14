@@ -1,5 +1,7 @@
 import { createParent, updateParent } from "@/lib/actions/people";
+import { ActionForm } from "@/components/action-form";
 import { SubmitButton } from "@/components/submit-button";
+import { CancelButton } from "@/components/cancel-button";
 import { TextInput } from "@/components/forms";
 import { NativeSelect } from "@/components/forms";
 
@@ -22,10 +24,13 @@ export function ParentForm({
   parent?: ParentFormData | null;
   mode: "create" | "edit";
 }) {
-  const action = parent ? updateParent.bind(null, parent.id) : createParent;
+  const action = async (formData: FormData) => {
+    if (parent) await updateParent(parent.id, formData);
+    else await createParent(formData);
+  };
 
   return (
-    <form action={action} className="space-y-6">
+    <ActionForm action={action} className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <TextInput name="firstName" label="First name" required defaultValue={parent?.firstName} />
         <TextInput name="lastName" label="Last name" required defaultValue={parent?.lastName} />
@@ -55,8 +60,9 @@ export function ParentForm({
         </label>
       </div>
       <div className="flex justify-end gap-2">
+        <CancelButton href={parent ? `/parents/${parent.id}` : "/parents"} />
         <SubmitButton>{mode === "create" ? "Create parent" : "Save changes"}</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }

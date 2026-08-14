@@ -22,7 +22,7 @@ export function StatCard({
       <CardContent className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+          <p className="mt-1 text-value">{value}</p>
           {sub ? <p className="mt-1 truncate text-xs text-muted-foreground">{sub}</p> : null}
         </div>
         {icon ? (

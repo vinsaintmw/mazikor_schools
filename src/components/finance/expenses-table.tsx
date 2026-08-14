@@ -39,7 +39,7 @@ export function ExpensesTable({
 
   return (
     <div className="rounded-xl border bg-card">
-      <Table>
+      <Table className="table-cards">
         <TableHeader>
           <TableRow>
             <TableHead>Reference</TableHead>
@@ -54,13 +54,19 @@ export function ExpensesTable({
         <TableBody>
           {list.rows.map((e) => (
             <TableRow key={e.id}>
-              <TableCell className="font-mono text-xs">{e.number}</TableCell>
-              <TableCell className="font-medium">{e.description}</TableCell>
-              <TableCell>{getLabel(e.category, EXPENSE_CATEGORIES)}</TableCell>
-              <TableCell>{e.vendor ?? "—"}</TableCell>
-              <TableCell className="font-mono">{formatMoney(e.amount)}</TableCell>
-              <TableCell>{formatDate(e.date)}</TableCell>
-              <TableCell>
+              <TableCell data-label="Reference" data-span="full" className="font-mono text-xs">
+                {e.number}
+              </TableCell>
+              <TableCell data-label="Description" data-span="full" className="font-medium">
+                {e.description}
+              </TableCell>
+              <TableCell data-label="Category">{getLabel(e.category, EXPENSE_CATEGORIES)}</TableCell>
+              <TableCell data-label="Vendor">{e.vendor ?? "—"}</TableCell>
+              <TableCell data-label="Amount" className="font-mono">
+                {formatMoney(e.amount)}
+              </TableCell>
+              <TableCell data-label="Date">{formatDate(e.date)}</TableCell>
+              <TableCell data-label="Actions" data-span="full">
                 <div className="flex justify-end">
                   {canManage ? (
                     <DeleteButton

@@ -29,6 +29,7 @@ model School {
   currency           String   @default("MWK")
   currencySymbol     String   @default("MK")
   primaryColor       String   @default("#1d4ed8")
+  secondaryColor     String   @default("#059669")
   isActive           Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -372,7 +373,7 @@ model SubjectTeacher {
 model Student {
   id              String        @id @default(cuid())
   schoolId        String
-  admissionNumber String        @unique
+  admissionNumber String
   userId          String?       @unique
   firstName       String
   middleName      String?
@@ -410,6 +411,7 @@ model Student {
   @@index([schoolId])
   @@index([streamId])
   @@index([status])
+  @@unique([schoolId, admissionNumber])
   @@map("student")
 }
 
@@ -490,7 +492,7 @@ model Enrollment {
 model Teacher {
   id             String         @id @default(cuid())
   schoolId       String
-  employeeId     String         @unique
+  employeeId     String
   userId         String?        @unique
   firstName      String
   lastName       String
@@ -521,13 +523,14 @@ model Teacher {
   resultsEntered Result[]
 
   @@index([schoolId])
+  @@unique([schoolId, employeeId])
   @@map("teacher")
 }
 
 model Staff {
   id             String         @id @default(cuid())
   schoolId       String
-  employeeId     String         @unique
+  employeeId     String
   userId         String?        @unique
   firstName      String
   lastName       String
@@ -552,6 +555,7 @@ model Staff {
   leaves     Leave[]
 
   @@index([schoolId])
+  @@unique([schoolId, employeeId])
   @@map("staff")
 }
 
@@ -781,7 +785,7 @@ model FeeStructure {
 model Invoice {
   id             String        @id @default(cuid())
   schoolId       String
-  number         String        @unique
+  number         String
   studentId      String
   termId         String?
   academicYearId String?
@@ -824,7 +828,7 @@ model InvoiceItem {
 model Payment {
   id            String        @id @default(cuid())
   schoolId      String
-  receiptNumber String        @unique
+  receiptNumber String
   invoiceId     String
   studentId     String
   amount        Decimal
@@ -844,7 +848,6 @@ model Payment {
   @@index([studentId])
   @@map("payment")
 }
-
 enum InvoiceStatus {
   PAID
   PARTIALLY_PAID
@@ -863,7 +866,7 @@ enum PaymentMethod {
 model Expense {
   id          String          @id @default(cuid())
   schoolId    String
-  number      String          @unique
+  number      String
   category    ExpenseCategory
   description String
   amount      Decimal
@@ -877,6 +880,7 @@ model Expense {
 
   school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
+  @@unique([schoolId, number])
   @@index([schoolId, date])
   @@map("expense")
 }
@@ -1288,4 +1292,21 @@ model AuditLog {
   @@index([schoolId, createdAt])
   @@index([userId])
   @@map("audit_log")
+}
+
+model DemoRequest {
+  id            String    @id @default(cuid())
+  schoolName    String
+  contactPerson String
+  phone         String
+  email         String
+  numStudents   Int       @default(0)
+  message       String?
+  status        String    @default("PENDING")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("demo_request")
 }

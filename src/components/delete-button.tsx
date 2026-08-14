@@ -15,19 +15,25 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { unwrapAction } from "@/lib/action-result";
 
 export function DeleteButton({
   action,
   confirmTitle = "Delete this record?",
   confirmDescription = "This action cannot be undone. The record will be permanently removed.",
+  successMessage = "Deleted",
   label = "Delete",
   redirectTo,
+  className,
 }: {
-  action: () => Promise<void>;
+  action: () => Promise<unknown>;
   confirmTitle?: string;
   confirmDescription?: string;
+  successMessage?: string;
   label?: string;
   redirectTo?: string;
+  className?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -36,7 +42,7 @@ export function DeleteButton({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" size="sm">
+        <Button variant="destructive" size="sm" className={className}>
           <Trash2Icon className="size-3.5" />
           {label}
         </Button>
@@ -54,10 +60,19 @@ export function DeleteButton({
               e.preventDefault();
               setPending(true);
               try {
-                await action();
+                const result = await action();
+                const unwrapped = unwrapAction(result);
+                if (!unwrapped.ok) {
+                  toast.error(unwrapped.error ?? "Could not delete. Please try again.");
+                  return;
+                }
+                toast.success(successMessage);
                 setOpen(false);
                 if (redirectTo) router.replace(redirectTo);
                 router.refresh();
+              } catch (err) {
+                console.error(err);
+                toast.error("Something went wrong. Please try again.");
               } finally {
                 setPending(false);
               }

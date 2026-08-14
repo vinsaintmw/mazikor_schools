@@ -11,14 +11,16 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
+import { ActionForm } from "@/components/action-form";
 import { TextInput, NativeSelect, TextAreaField } from "@/components/forms";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/lib/constants";
 import { todayISO } from "@/lib/format";
+import { toast } from "sonner";
 
 export function ExpenseDialog({
   action,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<unknown>;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -34,10 +36,11 @@ export function ExpenseDialog({
         <DialogHeader>
           <DialogTitle>New expense</DialogTitle>
         </DialogHeader>
-        <form
-          action={async (formData) => {
-            await action(formData);
+        <ActionForm
+          action={action}
+          onSuccess={() => {
             setOpen(false);
+            toast.success("Expense recorded");
           }}
           className="grid gap-4 sm:grid-cols-2"
         >
@@ -57,7 +60,7 @@ export function ExpenseDialog({
           <div className="flex justify-end sm:col-span-2">
             <SubmitButton>Create expense</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </DialogContent>
     </Dialog>
   );

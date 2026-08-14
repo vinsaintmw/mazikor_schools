@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getSchoolId } from "@/lib/server-helpers";
 import { formatMoney, formatNumber } from "@/lib/format";
-import { EXPENSE_CATEGORIES, getLabel } from "@/lib/constants";
+import { EXPENSE_CATEGORIES } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
@@ -26,43 +26,61 @@ export default async function FinanceReportsPage() {
   if (!session?.user) return null;
   const schoolId = getSchoolId(session);
 
-  const [payments, expenses, invoices] = await Promise.all([
-    db.payment.findMany({ where: { schoolId }, select: { amount: true, date: true } }),
-    db.expense.findMany({ where: { schoolId }, select: { amount: true, category: true, date: true } }),
-    db.invoice.findMany({
-      where: { schoolId },
-      include: { items: true, payments: true },
-    }),
-  ]);
+  const [revenueAgg, expenseAgg, expenseGroups, monthRevenue, invoiceAgg, invoiceCount, outstandingInvoices] =
+    await Promise.all([
+      db.payment.aggregate({ where: { schoolId }, _sum: { amount: true } }),
+      db.expense.aggregate({ where: { schoolId }, _sum: { amount: true } }),
+      db.expense.groupBy({ by: ["category"], where: { schoolId }, _sum: { amount: true } }),
+      db.$queryRaw<Array<{ month: string; revenue: number }>>`
+        SELECT to_char(date_trunc('month', "date"), 'Mon') AS month,
+               COALESCE(SUM(amount), 0)::float8 AS revenue
+        FROM payment
+        WHERE "schoolId" = ${schoolId}
+        GROUP BY 1
+      `,
+      Promise.all([
+        db.invoiceItem.aggregate({ where: { schoolId }, _sum: { amount: true } }),
+        db.invoice.aggregate({ where: { schoolId }, _sum: { discount: true } }),
+        db.payment.aggregate({ where: { schoolId }, _sum: { amount: true } }),
+      ]),
+      db.invoice.count({ where: { schoolId } }),
+      db.invoice.findMany({
+        where: { schoolId, status: { in: ["UNPAID", "OVERDUE"] } },
+        select: {
+          id: true,
+          number: true,
+          status: true,
+          discount: true,
+          items: { select: { amount: true } },
+          payments: { select: { amount: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+    ]);
 
-  const totalRevenue = payments.reduce((s, p) => s + Number(p.amount), 0);
-  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const totalRevenue = Number(revenueAgg._sum.amount ?? 0);
+  const totalExpenses = Number(expenseAgg._sum.amount ?? 0);
   const net = totalRevenue - totalExpenses;
 
-  const monthTotals = new Map<string, number>();
-  for (const p of payments) {
-    const key = new Date(p.date).toLocaleString("en", { month: "short" });
-    monthTotals.set(key, (monthTotals.get(key) ?? 0) + Number(p.amount));
-  }
   const monthsOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthTotals = new Map(monthRevenue.map((m) => [m.month, Number(m.revenue)]));
   const chart = monthsOrder.map((m) => ({ month: m, revenue: monthTotals.get(m) ?? 0 }));
 
+  const byCategory = new Map(expenseGroups.map((e) => [e.category, Number(e._sum.amount ?? 0)]));
   const expenseByCategory = EXPENSE_CATEGORIES.map((c) => ({
     category: c.label,
-    total: expenses.filter((e) => e.category === c.value).reduce((s, e) => s + Number(e.amount), 0),
+    total: byCategory.get(c.value) ?? 0,
   })).filter((e) => e.total > 0);
 
-  const invoiceStats = invoices.reduce(
-    (acc, inv) => {
-      const total = inv.items.reduce((s, i) => s + Number(i.amount), 0) - Number(inv.discount);
-      const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
-      acc.total += total;
-      acc.paid += paid;
-      acc.outstanding += Math.max(0, total - paid);
-      return acc;
-    },
-    { total: 0, paid: 0, outstanding: 0 }
-  );
+  const [itemsAgg, discountAgg, paidAgg] = invoiceAgg;
+  const invoiceTotal = Number(itemsAgg._sum.amount ?? 0) - Number(discountAgg._sum.discount ?? 0);
+  const invoicePaid = Number(paidAgg._sum.amount ?? 0);
+  const invoiceStats = {
+    total: invoiceTotal,
+    paid: invoicePaid,
+    outstanding: Math.max(0, invoiceTotal - invoicePaid),
+  };
 
   const stats = [
     { icon: <WalletIcon className="size-4" />, label: "Total revenue", value: formatMoney(totalRevenue), tone: "text-emerald-600" },
@@ -139,7 +157,7 @@ export default async function FinanceReportsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
-          {invoices.length ? (
+          {outstandingInvoices.length ? (
             <div className="rounded-lg border">
               <Table>
                 <TableHeader>
@@ -152,11 +170,10 @@ export default async function FinanceReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoices.map((inv) => {
+                  {outstandingInvoices.map((inv) => {
                     const total = inv.items.reduce((s, i) => s + Number(i.amount), 0) - Number(inv.discount);
                     const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
                     const balance = Math.max(0, total - paid);
-                    if (balance <= 0) return null;
                     return (
                       <TableRow key={inv.id}>
                         <TableCell className="font-mono text-xs">{inv.number}</TableCell>
@@ -172,8 +189,10 @@ export default async function FinanceReportsPage() {
                 </TableBody>
               </Table>
             </div>
-          ) : (
+          ) : invoiceCount === 0 ? (
             <EmptyState title="No invoices" description="No invoices have been created yet." icon={<ChartColumnIcon className="size-6" />} />
+          ) : (
+            <p className="py-6 text-center text-sm text-muted-foreground">All invoices are paid up.</p>
           )}
         </CardContent>
       </Card>
